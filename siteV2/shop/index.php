@@ -331,19 +331,19 @@
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
                     <div class="pay-method" onclick="processPurchase('sbp', 'tinkoff')">
-                        <img src="https://shop.minecraft-times.fun/themes/lullaby-dark/assets/images/payment-types/sbp.svg">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect fill='%231a5a9c' width='60' height='40' rx='4'/%3E%3Ctext fill='%23fff' font-size='18' x='30' y='27' text-anchor='middle'%3EСБП%3C/text%3E%3C/svg%3E">
                         <span class="pay-method-name">СБП</span>
                     </div>
                     <div class="pay-method" onclick="processPurchase('card', 'tinkoff')">
-                        <img src="https://shop.minecraft-times.fun/themes/lullaby-dark/assets/images/payment-types/mir.svg">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect fill='%230078c0' width='60' height='40' rx='4'/%3E%3Ctext fill='%23fff' font-size='18' x='30' y='27' text-anchor='middle'%3EМИР%3C/text%3E%3C/svg%3E">
                         <span class="pay-method-name">Карты РФ</span>
                     </div>
                     <div class="pay-method" onclick="processPurchase('card', 'yourpaymentsworld')">
-                        <img src="https://shop.minecraft-times.fun/themes/lullaby-dark/assets/images/payment-types/mastercard.svg">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect fill='%23ffb600' width='60' height='40' rx='4'/%3E%3Ccircle fill='%23eb001b' cx='28' cy='20' r='10'/%3E%3Ccircle fill='%23f79e1b' cx='32' cy='20' r='10'/%3E%3C/svg%3E">
                         <span class="pay-method-name">Ин. карты</span>
                     </div>
                     <div class="pay-method" onclick="processPurchase('advcash', 'advcash')">
-                        <img src="https://shop.minecraft-times.fun/themes/lullaby-dark/assets/images/payment-types/volet.svg">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect fill='%232d2d2d' width='60' height='40' rx='4'/%3E%3Ctext fill='%23fff' font-size='18' x='30' y='27' text-anchor='middle'%3EV%3C/text%3E%3C/svg%3E">
                         <span class="pay-method-name">Volet</span>
                     </div>
                 </div>

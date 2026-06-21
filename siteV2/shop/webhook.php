@@ -1,6 +1,29 @@
 <?php
 require_once __DIR__ . '/helpers.php';
 
+header('Access-Control-Allow-Origin: ' . (isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '*'));
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type');
+
+// Белый список IP EasyDonate (на основе документации)
+$allowedCidr = ['46.17.42.0/24', '5.61.56.0/24'];
+function ipInCidr(string $ip, string $cidr): bool {
+    [$subnet, $bits] = explode('/', $cidr);
+    $ipLong = ip2long($ip);
+    $subnetLong = ip2long($subnet);
+    $mask = -1 << (32 - (int)$bits);
+    return ($ipLong & $mask) === ($subnetLong & $mask);
+}
+$remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
+$ipOk = false;
+foreach ($allowedCidr as $cidr) {
+    if (ipInCidr($remoteIp, $cidr)) { $ipOk = true; break; }
+}
+if (!$ipOk && !empty($remoteIp)) {
+    http_response_code(403);
+    exit('Forbidden');
+}
+
 $rawBody = file_get_contents('php://input');
 $data = json_decode($rawBody);
 

@@ -693,8 +693,7 @@
         }
 
         function getItemImageUrl(item){
-            if(!item.item_id) return 'https://easydonate.ru/img/shop/default_product.png';
-            // item_id может быть как "diamond", так и "minecraft:diamond"
+            if(!item.item_id) return 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22%3E%3Crect fill=%22%23333%22 width=%2264%22 height=%2264%22/%3E%3C/svg%3E';
             const id = item.item_id.startsWith('minecraft:') ? item.item_id : 'minecraft:' + item.item_id;
             return `https://blocksitems.com/api/v1/items/${id}/icon?size=64`;
         }
@@ -710,7 +709,7 @@
                 card.className='card '+RARITY_CLASSES[r];
                 const imgUrl=getItemImageUrl(item);
                 card.innerHTML=`
-                    <img src="${imgUrl}" onerror="this.src='https://easydonate.ru/img/shop/default_product.png'">
+                    <img src="${imgUrl}" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22%3E%3Crect fill=%22%23333%22 width=%2264%22 height=%2264%22/%3E%3C/svg%3E'">
                     <span class="item-name">${formatMCName(item.name)}</span>
                 `;
                 track.appendChild(card);
@@ -728,7 +727,7 @@
                 el.className='drop-item';
                 el.innerHTML=`
                     <div class="drop-item-rarity" style="background:var(--c-${['common','uncommon','rare','epic','legendary'][r]})"></div>
-                    <img class="drop-item-icon" src="${getItemImageUrl(item)}" onerror="this.src='https://easydonate.ru/img/shop/default_product.png'">
+                    <img class="drop-item-icon" src="${getItemImageUrl(item)}" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22%3E%3Crect fill=%22%23333%22 width=%2264%22 height=%2264%22/%3E%3C/svg%3E'">
                     <div class="drop-item-info">
                         <span class="drop-item-name">${formatMCName(item.name)}</span>
                         <span class="drop-item-chance">${formatChance(item.chance)}%</span>
@@ -997,7 +996,7 @@
             overlay.className='result-overlay show '+rc;
             document.getElementById('resultBadge').textContent=rarityName;
             document.getElementById('resultImage').src=getItemImageUrl(winnerItem);
-            document.getElementById('resultImage').onerror=function(){this.src='https://easydonate.ru/img/shop/default_product.png'};
+            document.getElementById('resultImage').onerror=function(){this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22%3E%3Crect fill=%22%23333%22 width=%2264%22 height=%2264%22/%3E%3C/svg%3E'};
             const amountStr=item.amount>1?` x${item.amount}`:'';
             document.getElementById('resultName').innerHTML=formatMCName(winnerItem.name)+amountStr;
             document.getElementById('resultChance').textContent=`Шанс выпадения: ${formatChance(winnerItem.chance)}%`;

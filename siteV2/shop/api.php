@@ -1,5 +1,8 @@
 <?php
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: ' . (isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '*'));
+header('Access-Control-Allow-Methods: GET, POST');
+header('Access-Control-Allow-Headers: Content-Type');
 require_once __DIR__ . '/helpers.php';
 
 $action = $_GET['action'] ?? null;
@@ -25,7 +28,8 @@ if ($action === 'create_case_payment') {
         'email'       => $email,
     ];
 
-    $params['success_url'] = 'http://' . $_SERVER['HTTP_HOST'] . '/shop/roulette.php?payment_id=__PAYMENT_ID__';
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $params['success_url'] = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/shop/roulette.php?payment_id=__PAYMENT_ID__';
 
     if ($payType) {
         $params['payment_type'] = $payType;
@@ -54,7 +58,8 @@ if ($action === 'create_case_payment') {
             'pending_amount'    => null,
         ];
         savePayments($payments);
-        $url = 'http://' . $_SERVER['HTTP_HOST'] . '/shop/roulette.php?payment_id=' . $fakeId;
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $url = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/shop/roulette.php?payment_id=' . $fakeId;
         echo json_encode(['success' => true, 'response' => ['url' => $url]]);
         exit;
     }
@@ -316,7 +321,7 @@ if ($action === 'spin_case') {
     if ($caseData) {
         foreach ($caseData['product']['commands'] as $cmd) {
             // Ищем give команду: give <игрок> <предмет> [количество]
-            if (preg_match('/^give\s+\S+\s+/i', $cmd, $m)) {
+            if (preg_match('/^(minecraft:)?give\s+\S+\s+/i', $cmd, $m)) {
                 // Заменяем placeholders в шаблоне, оставляя место под item_id
                 $giveTemplate = preg_replace(
                     '/\{player\}|\{user\}|\{username\}|\{amount\}/i',
@@ -348,7 +353,7 @@ if ($action === 'spin_case') {
             $rcon->disconnect();
             $rconSuccess = true;
         } catch (Exception $e) {
-            $rconResult = 'RCON: ' . $e->getMessage();
+            $rconResult = 'RCON: внутренняя ошибка сервера';
         }
     } else {
         $rconResult = 'Команда для выдачи не настроена в товаре';
@@ -404,6 +409,7 @@ if ($action === 'create_payment') {
     $payMethod = $input['payment_method'] ?? null;
     $serverId = (int)($input['server_id'] ?? SERVER_ID);
     $productsRaw = $input['products'] ?? '{}';
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
     if (!$customer || !$email) {
         echo json_encode(['success' => false, 'response' => 'Заполните ник и email']);
@@ -468,13 +474,13 @@ if ($action === 'create_payment') {
             }
             $rcon->disconnect();
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'response' => 'RCON: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'response' => 'RCON: внутренняя ошибка сервера']);
             exit;
         }
         echo json_encode([
             'success' => true,
             'response' => [
-                'url' => 'http://' . $_SERVER['HTTP_HOST'] . '/shop/index.php?status=success',
+                'url' => $scheme . '://' . $_SERVER['HTTP_HOST'] . '/shop/index.php?status=success',
                 'test_mode' => true,
                 'rcon_all_ok' => $allSuccess,
                 'rcon_results' => $rconResults,
@@ -488,7 +494,7 @@ if ($action === 'create_payment') {
         'server_id'   => $serverId,
         'products'    => json_encode($productsArr),
         'email'       => $email,
-        'success_url' => 'http://' . $_SERVER['HTTP_HOST'] . '/shop/index.php?status=success'
+        'success_url' => $scheme . '://' . $_SERVER['HTTP_HOST'] . '/shop/index.php?status=success'
     ];
 
     if ($coupon) $params['coupon'] = $coupon;
@@ -507,7 +513,7 @@ if ($action === 'create_payment') {
             "method" => "GET",
             "header" => "Shop-Key: " . SHOP_KEY . "\r\n"
         ],
-        "ssl" => ["verify_peer" => false, "verify_peer_name" => false]
+        "ssl" => ["verify_peer" => true, "verify_peer_name" => true]
     ];
 
     $context = stream_context_create($opts);

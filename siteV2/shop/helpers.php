@@ -13,7 +13,7 @@ if (file_exists($configPath)) {
     define('RCON_TIMEOUT',  3);
     define('PAYMENTS_FILE', __DIR__ . '/payments.json');
     define('TEST_MODE_FILE', __DIR__ . '/test_mode.json');
-    define('ADMIN_PASS',    'admin');
+    // define('ADMIN_PASS', ''); — fallback не задан, доступ будет только через config.php
 }
 
 function loadPayments(): array
@@ -57,7 +57,7 @@ function easyDonateRequest(string $url): ?array
             "method" => "GET",
             "header" => "Shop-Key: " . SHOP_KEY . "\r\n"
         ],
-        "ssl" => ["verify_peer" => false, "verify_peer_name" => false]
+        "ssl" => ["verify_peer" => true, "verify_peer_name" => true]
     ];
     $context = stream_context_create($opts);
     $response = @file_get_contents($url, false, $context);
@@ -68,10 +68,9 @@ function easyDonateRequest(string $url): ?array
 function isCaseProduct(array $product): bool
 {
     if (!empty($product['commands'])) {
-        foreach ($product['commands'] as $cmd) {
-            if (preg_match('/выбил:/u', $cmd)) {
-                return true;
-            }
+        $text = implode(' ', $product['commands']);
+        if (preg_match('/выбил:|\(\d+\.?\d*%\)/u', $text)) {
+            return true;
         }
     }
     return false;
@@ -80,32 +79,53 @@ function isCaseProduct(array $product): bool
 function parseCaseItems(array $product): array
 {
     $items = [];
+
     foreach ($product['commands'] as $command) {
-        preg_match('/выбил:\s+(.+?)(?:\s*\(|$)/u', $command, $nameMatches);
-        preg_match('/\(([\d.]+)%\)/', $command, $chanceMatches);
-        preg_match('/give\s+\{?\w+\}?\s+(\S+)\s+(\d+)/u', $command, $itemIdMatches);
+        $segments = explode(';', $command);
 
-        $rawId = $itemIdMatches[1] ?? null;
-        // Нормализуем item_id: убираем дублирующийся minecraft: префикс
-        if ($rawId && str_starts_with($rawId, 'minecraft:')) {
-            $rawId = substr($rawId, 10);
+        $current = null;
+
+        foreach ($segments as $seg) {
+            $seg = trim($seg);
+            if (!$seg) continue;
+
+            // give-команда — начало нового предмета
+            if (preg_match('/give\s+\{?\w+\}?\s+(\S+)\s+(\d+)/u', $seg, $m)) {
+                if ($current) {
+                    $current['weight'] = max(1, (int)round($current['chance'] * 100));
+                    $items[] = $current;
+                }
+                $rawId = $m[1];
+                if (str_starts_with($rawId, 'minecraft:')) {
+                    $rawId = substr($rawId, 10);
+                }
+                $current = [
+                    'item_id' => $rawId,
+                    'amount'  => (int)$m[2],
+                    'name'    => ucfirst($rawId),
+                    'chance'  => 0,
+                ];
+            }
+
+            // выбил: — имя предмета
+            if (preg_match('/выбил:\s*(.+?)(?:\s*\(|$)/u', $seg, $m)) {
+                if (!$current) $current = ['item_id' => null, 'amount' => 1, 'name' => 'Предмет', 'chance' => 0];
+                $current['name'] = trim($m[1]);
+            }
+
+            // шанс в любом сегменте
+            if (preg_match('/\(([\d.]+)%\)/', $seg, $m)) {
+                if (!$current) $current = ['item_id' => null, 'amount' => 1, 'name' => 'Предмет', 'chance' => 0];
+                $current['chance'] = (float)$m[1];
+            }
         }
-        $itemId = $rawId;
 
-        $amount = $itemIdMatches[2] ?? 1;
-        $chance = (float)($chanceMatches[1] ?? 0);
-        $name = $nameMatches[1] ?? ($itemId ? ucfirst($itemId) : "Предмет");
-
-        $weight = max(1, (int)round($chance * 100));
-
-        $items[] = [
-            'name'     => $name,
-            'chance'   => $chance,
-            'weight'   => $weight,
-            'item_id'  => $itemId,
-            'amount'   => (int)$amount,
-        ];
+        if ($current) {
+            $current['weight'] = max(1, (int)round($current['chance'] * 100));
+            $items[] = $current;
+        }
     }
+
     return $items;
 }
 

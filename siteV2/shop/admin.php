@@ -1,12 +1,57 @@
 <?php
 session_start();
+
+// Безопасные настройки сессии
+ini_set('session.gc_maxlifetime', 1800);
+ini_set('session.cookie_lifetime', 1800);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.use_strict_mode', 1);
+ini_set('session.use_only_cookies', 1);
+
 require_once __DIR__ . '/helpers.php';
 
 // Конфигурация читается из config.php (через helpers.php)
 $SHOP_KEY   = SHOP_KEY;
-$ADMIN_PASS = ADMIN_PASS;
+$ADMIN_PASS = defined('ADMIN_PASS') ? ADMIN_PASS : '';
 
-if (isset($_POST['pass']) && $_POST['pass'] === $ADMIN_PASS) $_SESSION['auth'] = true;
+// Таймаут сессии 30 минут
+if (isset($_SESSION['auth']) && $_SESSION['auth']) {
+    if (isset($_SESSION['login_time']) && time() - $_SESSION['login_time'] > 1800) {
+        session_destroy();
+        header('Location: ?');
+        exit;
+    }
+    $_SESSION['login_time'] = time();
+}
+
+// Rate limiting: 5 попыток, бан 15 минут
+if (!isset($_SESSION['login_attempts'])) $_SESSION['login_attempts'] = [];
+$_SESSION['login_attempts'] = array_filter($_SESSION['login_attempts'], fn($t) => $t > time() - 900);
+if (count($_SESSION['login_attempts']) >= 5) {
+    $remaining = 900 - (time() - min($_SESSION['login_attempts']));
+    if ($remaining > 0) {
+        if (isset($_POST['pass'])) {
+            echo '<body style="background:#0f1218;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;flex-direction:column;">';
+            echo '<h2>Слишком много попыток</h2><p style="color:#8b949e;margin-top:10px;">Повторите через ' . ceil($remaining / 60) . ' мин.</p></body>';
+            exit;
+        }
+    } else {
+        $_SESSION['login_attempts'] = [];
+    }
+}
+
+if (isset($_POST['pass'])) {
+    if ($_POST['pass'] === $ADMIN_PASS) {
+        $_SESSION['auth'] = true;
+        $_SESSION['login_time'] = time();
+        $_SESSION['login_attempts'] = [];
+    } else {
+        $_SESSION['login_attempts'][] = time();
+        header('Location: ?');
+        exit;
+    }
+}
 if (!isset($_SESSION['auth'])):
 ?>
 <body style="background:#0f1218;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
@@ -91,7 +136,7 @@ function fetchProducts(): array {
     foreach ($urls as $url) {
         $opts = [
             "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10],
-            "ssl"  => ["verify_peer" => false, "verify_peer_name" => false],
+            "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
         ];
         $res  = @file_get_contents($url, false, stream_context_create($opts));
         if (!$res) continue;
@@ -155,7 +200,7 @@ function getAdvancedStats(): array {
         $url  = "https://easydonate.ru/api/v3/shop/payments?paginate=50&page={$currentPage}";
         $opts = [
             "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 30],
-            "ssl"  => ["verify_peer" => false, "verify_peer_name" => false],
+            "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
         ];
         $res  = @file_get_contents($url, false, stream_context_create($opts));
         if (!$res) break;
@@ -257,44 +302,6 @@ if (isset($_GET['refresh_products'])) {
 if (isset($_GET['toggle_test'])) {
     setTestMode(!isTestMode());
     header('Location: ?');
-    exit;
-}
-
-// Debug
-if (isset($_GET['debug'])) {
-    $url  = "https://easydonate.ru/api/v3/shop/payments?paginate=50&page=1";
-    $opts = ["http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10], "ssl" => ["verify_peer" => false, "verify_peer_name" => false]];
-    header('Content-Type: application/json; charset=utf-8');
-    echo @file_get_contents($url, false, stream_context_create($opts));
-    exit;
-}
-// Дебаг товаров: ?debug_products=1 — видно реальные имена и картинки из API
-if (isset($_GET['debug_products'])) {
-    $url  = "https://easydonate.ru/api/v3/shop/products";
-    $opts = ["http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10], "ssl" => ["verify_peer" => false, "verify_peer_name" => false]];
-    $raw  = @file_get_contents($url, false, stream_context_create($opts));
-    $data = json_decode($raw, true);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<style>body{background:#0b0e14;color:#ced4da;font-family:monospace;padding:20px;}</style>';
-    echo '<h2>Товары из API (имена для матчинга)</h2><table border=1 cellpadding=6 style="border-color:#333">';
-    echo '<tr><th>ID</th><th>name (raw)</th><th>normalizeProductName()</th><th>image</th></tr>';
-    if (isset($data['response'])) {
-        foreach ($data['response'] as $p) {
-            $raw_name = (string)($p['name'] ?? '');
-            echo '<tr><td>' . $p['id'] . '</td><td>' . htmlspecialchars($raw_name) . '</td>'
-               . '<td>' . htmlspecialchars(strtolower(trim($raw_name))) . '</td>'
-               . '<td>' . ($p['image'] ? '<img src="' . htmlspecialchars($p['image']) . '" height=30>' : '—') . '</td></tr>';
-        }
-    }
-    echo '</table>';
-    echo '<hr><h3>Ключи из кэша productImages:</h3><pre>';
-    $ci = getCachedStats($GLOBALS['productCacheFile'], 99999);
-    echo htmlspecialchars(print_r($ci, true));
-    echo '</pre>';
-    echo '<hr><h3>Ключи product_totals из статистики:</h3><pre>';
-    $cs = getCachedStats($GLOBALS['cacheFile'], 99999);
-    echo htmlspecialchars(print_r(array_keys($cs['product_totals'] ?? []), true));
-    echo '</pre>';
     exit;
 }
 
@@ -608,7 +615,7 @@ function getPayments(int $page = 1): ?array {
     $url  = "https://easydonate.ru/api/v3/shop/payments?paginate=50&page={$page}";
     $opts = [
         "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10],
-        "ssl"  => ["verify_peer" => false, "verify_peer_name" => false],
+        "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
     ];
     $res  = @file_get_contents($url, false, stream_context_create($opts));
     $data = json_decode($res, true);

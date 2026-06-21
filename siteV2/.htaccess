@@ -1,26 +1,45 @@
 RewriteEngine On
 
-# 1. Редирект с сайт.ру/index.html на сайт.ру/
+# Редирект с сайт.ру/index.html на сайт.ру/
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s(.*)/index\.html [NC]
 RewriteRule ^ %1/ [R=301,L]
 
-# 2. Если ты хочешь скрыть слово "index" без расширения (если уже настроил Pretty URLs)
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s(.*)/index [NC]
 RewriteRule ^ %1/ [R=301,L]
 
-# 1. Исключаем /shop/ из HTML rewrite правил (PHP-файлы)
+# Исключаем /shop/ из HTML rewrite правил (PHP-файлы)
 RewriteRule ^shop/ - [L]
 
-# 2. Убираем расширение .html из видимого адреса (редирект)
+# Защита config.php от прямого доступа
+<Files "config.php">
+  Require all denied
+</Files>
+
+# Убираем расширение .html из видимого адреса (редирект)
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s([^.]+)\.html [NC]
 RewriteRule ^ %1 [R=301,L]
 
-# 3. Внутренне подставляем .html, чтобы сервер нашел файл
+# Внутренне подставляем .html
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteRule ^(.*?)/?$ $1.html [L]
 
-# Кеширование статических ресурсов
+# ===== Security Headers =====
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+  # HSTS — включает HTTPS enforcement (раскомментировать только когда HTTPS настроен!)
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  
+  # CSP — Content Security Policy
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://via.placeholder.com https://mc-heads.net https://cdn.easydonate.ru https://blocksitems.com; connect-src 'self' https://api.mcsrvstat.us https://blocksitems.com; frame-src 'none'; font-src 'self' https://fonts.gstatic.com"
+</IfModule>
+
+# ===== Кеширование статики =====
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType image/webp "access plus 1 year"
