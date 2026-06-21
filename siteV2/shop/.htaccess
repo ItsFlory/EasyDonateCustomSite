@@ -1,0 +1,9 @@
+# Защита JSON-файлов (payments, конфиги тест-режима)
+<FilesMatch "\.json$">
+  Require all denied
+</FilesMatch>
+
+# Защита cacert.pem (CA bundle)
+<Files "cacert.pem">
+  Require all denied
+</Files>

@@ -1,29 +1,6 @@
 <?php
 require_once __DIR__ . '/helpers.php';
 
-header('Access-Control-Allow-Origin: ' . (isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '*'));
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
-
-// Белый список IP EasyDonate (на основе документации)
-$allowedCidr = ['46.17.42.0/24', '5.61.56.0/24'];
-function ipInCidr(string $ip, string $cidr): bool {
-    [$subnet, $bits] = explode('/', $cidr);
-    $ipLong = ip2long($ip);
-    $subnetLong = ip2long($subnet);
-    $mask = -1 << (32 - (int)$bits);
-    return ($ipLong & $mask) === ($subnetLong & $mask);
-}
-$remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
-$ipOk = false;
-foreach ($allowedCidr as $cidr) {
-    if (ipInCidr($remoteIp, $cidr)) { $ipOk = true; break; }
-}
-if (!$ipOk && !empty($remoteIp)) {
-    http_response_code(403);
-    exit('Forbidden');
-}
-
 $rawBody = file_get_contents('php://input');
 $data = json_decode($rawBody);
 
@@ -32,7 +9,7 @@ if (!$data) {
     exit('Invalid JSON');
 }
 
-// Проверка цифровой подписи
+// Проверка цифровой подписи (HMAC) — единственная защита вебхука
 $hashString = implode('@', [
     $data->payment_id ?? '',
     $data->cost ?? '',
@@ -40,7 +17,7 @@ $hashString = implode('@', [
 ]);
 $expectedSignature = hash_hmac('sha256', $hashString, SHOP_KEY);
 
-if (strcasecmp($expectedSignature, $data->signature ?? '') !== 0) {
+if (!hash_equals($expectedSignature, $data->signature ?? '')) {
     http_response_code(403);
     exit('Bad signature');
 }
@@ -63,42 +40,42 @@ foreach ($data->products ?? [] as $product) {
     }
 }
 
-$payments = loadPayments();
 $paymentId = (int)$data->payment_id;
 
-if (isset($payments[$paymentId])) {
-    // Обновляем только статус, не затирая multi-spin данные (spins_total, spins_left, won_items)
-    $payments[$paymentId]['status'] = 'paid';
-    $payments[$paymentId]['customer'] = $data->customer ?? $payments[$paymentId]['customer'];
-    if ($isCase) {
-        $payments[$paymentId]['case_id'] = $caseId;
-        $payments[$paymentId]['case_name'] = $caseName ?? $payments[$paymentId]['case_name'];
+withPaymentsLock(function(&$payments) use ($paymentId, $data, $isCase, $caseId, $caseName) {
+    if (isset($payments[$paymentId])) {
+        // Обновляем только статус, не затирая multi-spin данные
+        $payments[$paymentId]['status'] = 'paid';
+        $payments[$paymentId]['customer'] = $data->customer ?? $payments[$paymentId]['customer'];
+        if ($isCase) {
+            $payments[$paymentId]['case_id'] = $caseId;
+            $payments[$paymentId]['case_name'] = $caseName ?? $payments[$paymentId]['case_name'];
+        }
+    } else {
+        // Новая запись
+        $entry = [
+            'customer' => $data->customer ?? '',
+            'case_id' => $caseId ?? 0,
+            'case_name' => $caseName ?? 'Кейс',
+            'status' => 'paid',
+            'used' => false,
+            'cost' => $data->cost ?? 0,
+            'created_at' => $data->created_at ?? date('Y-m-d H:i:s'),
+        ];
+
+        if ($isCase) {
+            $entry['spins_total'] = 1;
+            $entry['spins_left'] = 1;
+            $entry['won_items'] = [];
+            $entry['pending_item'] = null;
+            $entry['pending_item_id'] = null;
+            $entry['pending_amount'] = null;
+        }
+
+        $payments[$paymentId] = $entry;
     }
-} else {
-    // Новая запись
-    $entry = [
-        'customer' => $data->customer ?? '',
-        'case_id' => $caseId ?? 0,
-        'case_name' => $caseName ?? 'Кейс',
-        'status' => 'paid',
-        'used' => false,
-        'cost' => $data->cost ?? 0,
-        'created_at' => $data->created_at ?? date('Y-m-d H:i:s'),
-    ];
-
-    if ($isCase) {
-        $entry['spins_total'] = 1;
-        $entry['spins_left'] = 1;
-        $entry['won_items'] = [];
-        $entry['pending_item'] = null;
-        $entry['pending_item_id'] = null;
-        $entry['pending_amount'] = null;
-    }
-
-    $payments[$paymentId] = $entry;
-}
-
-savePayments($payments);
+    return true;
+});
 
 http_response_code(200);
 echo 'OK';

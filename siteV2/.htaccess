@@ -36,7 +36,7 @@ RewriteRule ^(.*?)/?$ $1.html [L]
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
   
   # CSP — Content Security Policy
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://via.placeholder.com https://mc-heads.net https://cdn.easydonate.ru https://blocksitems.com; connect-src 'self' https://api.mcsrvstat.us https://blocksitems.com; frame-src 'none'; font-src 'self' https://fonts.gstatic.com"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://via.placeholder.com https://mc-heads.net https://cdn.easydonate.ru https://blocksitems.com; connect-src 'self' https://api.mcsrvstat.us https://blocksitems.com; frame-src 'none'; font-src 'self' https://fonts.gstatic.com"
 </IfModule>
 
 # ===== Кеширование статики =====

@@ -23,6 +23,15 @@ if (isset($_SESSION['auth']) && $_SESSION['auth']) {
         exit;
     }
     $_SESSION['login_time'] = time();
+
+    // Привязка сессии к IP (защита от перехвата сессии)
+    $sessionIp = $_SESSION['login_ip'] ?? null;
+    $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($sessionIp && $sessionIp !== $currentIp) {
+        session_destroy();
+        header('Location: ?');
+        exit;
+    }
 }
 
 // Rate limiting: 5 попыток, бан 15 минут
@@ -42,10 +51,14 @@ if (count($_SESSION['login_attempts']) >= 5) {
 }
 
 if (isset($_POST['pass'])) {
-    if ($_POST['pass'] === $ADMIN_PASS) {
+    // Constant-time сравнение через hash_equals
+    $inputHash = hash('sha256', $_POST['pass']);
+    $storedHash = hash('sha256', $ADMIN_PASS);
+    if (hash_equals($storedHash, $inputHash)) {
         $_SESSION['auth'] = true;
         $_SESSION['login_time'] = time();
         $_SESSION['login_attempts'] = [];
+        $_SESSION['login_ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
     } else {
         $_SESSION['login_attempts'][] = time();
         header('Location: ?');
@@ -64,8 +77,10 @@ if (!isset($_SESSION['auth'])):
 <?php exit; endif;
 
 // --- КЭШИРОВАНИЕ ---
-$cacheFile        = sys_get_temp_dir() . '/easydonate_stats_cache.json';
-$productCacheFile = sys_get_temp_dir() . '/easydonate_products_cache.json';
+$cacheDir         = __DIR__ . '/cache';
+if (!is_dir($cacheDir)) { @mkdir($cacheDir, 0700, true); }
+$cacheFile        = $cacheDir . '/easydonate_stats_cache.json';
+$productCacheFile = $cacheDir . '/easydonate_products_cache.json';
 $cacheTtl         = 300;  // 5 минут — основная статистика
 $productCacheTtl  = 3600; // 1 час — товары меняются редко
 
@@ -136,7 +151,7 @@ function fetchProducts(): array {
     foreach ($urls as $url) {
         $opts = [
             "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10],
-            "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
+            "ssl"  => sslContext(),
         ];
         $res  = @file_get_contents($url, false, stream_context_create($opts));
         if (!$res) continue;
@@ -193,6 +208,7 @@ function getAdvancedStats(): array {
         'customer_emails'  => [],
         'total_payments'   => 0,
         'pages_fetched'    => 0,
+        'last_page'        => 0,
         'all_pages_loaded' => false,
     ];
 
@@ -200,16 +216,30 @@ function getAdvancedStats(): array {
         $url  = "https://easydonate.ru/api/v3/shop/payments?paginate=50&page={$currentPage}";
         $opts = [
             "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 30],
-            "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
+            "ssl"  => sslContext(),
         ];
         $res  = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$res) break;
+        if (!$res) {
+            error_log('EasyDonate API error at page ' . $currentPage . ' URL: ' . $url);
+            break;
+        }
         $data = json_decode($res, true);
-        if (!isset($data['response'])) break;
+        if (!isset($data['response'])) {
+            error_log('EasyDonate API: пустой response на странице ' . $currentPage . ' URL: ' . $url);
+            break;
+        }
         $resp = isset($data['response'][0]) ? $data['response'][0] : $data['response'];
 
-        if (!isset($resp['data']) || !is_array($resp['data']) || empty($resp['data'])) break;
+        if (!isset($resp['data']) || !is_array($resp['data']) || empty($resp['data'])) {
+            if ($currentPage === 1) {
+                error_log('EasyDonate API: нет data даже на 1-й странице, URL: ' . $url);
+            }
+            break;
+        }
 
+        if ($currentPage === 1) {
+            $stats['last_page'] = (int)($resp['last_page'] ?? 0);
+        }
         $stats['pages_fetched']++;
 
         foreach ($resp['data'] as $p) {
@@ -281,7 +311,7 @@ function getAdvancedStats(): array {
         usleep(200000);
     } while ($hasNext !== null);
 
-    $stats['all_pages_loaded'] = true;
+    $stats['all_pages_loaded'] = ($stats['last_page'] > 0 && $stats['pages_fetched'] >= $stats['last_page']);
     $stats['global_revenue']   = $globalRevenue;
     return $stats;
 }
@@ -321,9 +351,18 @@ $needsRebuild = !$fullStats
     || !isset($fullStats['all_pages_loaded']) || !$fullStats['all_pages_loaded'];
 
 if ($needsRebuild) {
-    @unlink($cacheFile);
-    $fullStats = getAdvancedStats();
-    @file_put_contents($cacheFile, json_encode($fullStats));
+    $fresh = getAdvancedStats();
+    if ($fresh['pages_fetched'] > 0) {
+        $fullStats = $fresh;
+        @file_put_contents($cacheFile, json_encode($fullStats));
+    } else {
+        error_log('EasyDonate cache rebuild failed — keeping old cache');
+        // Если кеша нет совсем — создаём пустой, чтобы страница не падала
+        if (!$fullStats) {
+            $fullStats = $fresh;
+            @file_put_contents($cacheFile, json_encode($fullStats));
+        }
+    }
 }
 
 // Товары (иконки)
@@ -615,9 +654,13 @@ function getPayments(int $page = 1): ?array {
     $url  = "https://easydonate.ru/api/v3/shop/payments?paginate=50&page={$page}";
     $opts = [
         "http" => ["method" => "GET", "header" => "Shop-Key: $SHOP_KEY\r\n", "timeout" => 10],
-        "ssl"  => ["verify_peer" => true, "verify_peer_name" => true],
+        "ssl"  => sslContext(),
     ];
     $res  = @file_get_contents($url, false, stream_context_create($opts));
+    if ($res === false) {
+        error_log('EasyDonate API error in getPayments URL: ' . $url);
+        return null;
+    }
     $data = json_decode($res, true);
     return isset($data['response'][0]) ? $data['response'][0] : ($data['response'] ?? null);
 }
@@ -718,10 +761,11 @@ if ($selectedProductName) {
 <body>
 <div class="container">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <h1 style="margin:0;"><?= $tab === 'catalog' ? 'Каталог товаров' : 'Аналитика магазина' ?></h1>
+        <h1 style="margin:0;"><?= $tab === 'catalog' ? 'Каталог товаров' : ($tab === 'system' ? 'Системная диагностика' : 'Аналитика магазина') ?></h1>
         <div style="display:flex;gap:8px;">
             <a href="?tab=dashboard" style="padding:8px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;<?= $tab === 'dashboard' ? 'background:#2ecc71;color:#0b0e14;' : 'background:#21262d;color:#8b949e;' ?>">Dashboard</a>
             <a href="?tab=catalog" style="padding:8px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;<?= $tab === 'catalog' ? 'background:#2ecc71;color:#0b0e14;' : 'background:#21262d;color:#8b949e;' ?>">Каталог</a>
+            <a href="?tab=system" style="padding:8px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;<?= $tab === 'system' ? 'background:#2ecc71;color:#0b0e14;' : 'background:#21262d;color:#8b949e;' ?>">Система</a>
         </div>
     </div>
 
@@ -729,10 +773,15 @@ if ($selectedProductName) {
     <div class="cache-bar">
         <span>
             Статистика обновлена: <b><?= $cacheAge < 10 ? 'только что' : gmdate('i:s', $cacheAge) . ' назад' ?></b>
-            <?php if (!$fullStats['all_pages_loaded']): ?>
-                <span class="warn">⚠ Загружены не все страницы, данные могут быть неполными</span>
+            <span style="margin-left:8px;color:#8b949e;">
+                (страницы: <?= $fullStats['pages_fetched'] ?><?= $fullStats['last_page'] > 0 ? ' / ' . $fullStats['last_page'] : '' ?>)
+            </span>
+            <?php if ($fullStats['pages_fetched'] === 0): ?>
+                <span class="warn" style="display:block;margin-top:6px;">⚠ Не удалось загрузить данные из EasyDonate API. Проверьте соединение или CA-сертификаты.</span>
+            <?php elseif (!$fullStats['all_pages_loaded']): ?>
+                <span class="warn" style="display:block;margin-top:6px;">⚠ Загружены не все страницы (<?= $fullStats['pages_fetched'] ?> из <?= $fullStats['last_page'] ?>), данные могут быть неполными</span>
             <?php else: ?>
-                <span style="color:#2ecc71;margin-left:8px;">✓ Все данные загружены</span>
+                <span style="color:#2ecc71;margin-left:8px;">✓ Все страницы загружены</span>
             <?php endif; ?>
         </span>
         <span style="display:flex;gap:12px;align-items:center;">
@@ -1882,5 +1931,61 @@ new Chart(document.getElementById('paretoChart'), {
 });
 <?php endif; ?>
 </script>
+
+<?php if ($tab === 'system'): ?>
+<div style="max-width:800px;">
+    <div style="background:#161922;border-radius:12px;padding:24px;border:1px solid rgba(255,255,255,0.06);">
+
+        <h3 style="margin:0 0 20px;">Информация о PHP</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">Версия PHP</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= phpversion() ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">allow_url_fopen</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('allow_url_fopen') ? '<span style="color:#2ecc71;">✓ On</span>' : '<span style="color:#e74c3c;">✗ Off</span>' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">allow_url_include</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('allow_url_include') ? '<span style="color:#e74c3c;">✓ On (опасно)</span>' : '<span style="color:#2ecc71;">✗ Off</span>' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">max_execution_time</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('max_execution_time') ?>s</td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">memory_limit</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('memory_limit') ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">display_errors</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('display_errors') ? '<span style="color:#e74c3c;">✓ On</span>' : '<span style="color:#2ecc71;">✗ Off</span>' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">date.timezone</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ini_get('date.timezone') ?: 'не задан' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">open_basedir</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= ($val = ini_get('open_basedir')) ? htmlspecialchars($val, ENT_QUOTES, 'UTF-8') : '<span style="color:#2ecc71;">не ограничен</span>' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">openssl</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= extension_loaded('openssl') ? '<span style="color:#2ecc71;">✓ Загружен</span>' : '<span style="color:#e74c3c;">✗ Отсутствует</span>' ?></td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;">JSON</td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= extension_loaded('json') ? '<span style="color:#2ecc71;">✓ Загружен</span>' : '<span style="color:#e74c3c;">✗ Отсутствует</span>' ?></td></tr>
+        </table>
+
+        <h3 style="margin:24px 0 20px;">Последняя ошибка PHP</h3>
+        <pre style="background:#0b0e14;border-radius:8px;padding:16px;font-size:13px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;">
+<?php
+$lastError = error_get_last();
+if ($lastError) {
+    echo htmlspecialchars("{$lastError['message']}\n  in {$lastError['file']}:{$lastError['line']}", ENT_QUOTES, 'UTF-8');
+} else {
+    echo 'Нет сохранённых ошибок';
+}
+?>
+        </pre>
+
+        <h3 style="margin:24px 0 20px;">Проверка сети</h3>
+        <?php
+        $testUrls = [
+            'EasyDonate (главная)' => ['url' => 'https://easydonate.ru/', 'ctx' => stream_context_create(['http' => ['timeout' => 5], 'ssl' => sslContext()])],
+            'EasyDonate API (авторизация)' => ['url' => 'https://easydonate.ru/api/v3/shop/payments?paginate=1&page=1', 'ctx' => stream_context_create(['http' => ['method' => 'GET', 'header' => "Shop-Key: $SHOP_KEY\r\n", 'timeout' => 5], 'ssl' => sslContext()])],
+            'blocksitems.com' => ['url' => 'https://blocksitems.com/', 'ctx' => stream_context_create(['http' => ['timeout' => 5], 'ssl' => sslContext()])],
+            'Google (общий доступ)' => ['url' => 'https://www.google.com', 'ctx' => stream_context_create(['http' => ['timeout' => 5], 'ssl' => sslContext()])],
+        ];
+        ?>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <?php foreach ($testUrls as $label => $cfg): ?>
+            <?php
+            $testRes = @file_get_contents($cfg['url'], false, $cfg['ctx']);
+            $httpCode = 0;
+            if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+                $httpCode = (int)$m[1];
+            }
+            $ok = $testRes !== false && $httpCode >= 200 && $httpCode < 500;
+            ?>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #21262d;color:#8b949e;"><?= $label ?></td><td style="padding:8px 12px;border-bottom:1px solid #21262d;"><?= $ok ? '<span style="color:#2ecc71;">✓ Доступен</span>' : '<span style="color:#e74c3c;">✗ ' . ($httpCode ? "HTTP $httpCode" : 'Недоступен') . '</span>' ?></td></tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 </body>
 </html>

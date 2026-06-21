@@ -1,11 +1,23 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: ' . (isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '*'));
+$allowedOrigin = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$allowedOrigin .= '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+header('Access-Control-Allow-Origin: ' . $allowedOrigin);
 header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
 require_once __DIR__ . '/helpers.php';
 
 $action = $_GET['action'] ?? null;
+
+// Валидация Minecraft ника (только латиница, цифры, подчёркивание, 3-16 символов)
+function validateNickname(string $nick): bool {
+    return (bool)preg_match('/^[a-zA-Z0-9_]{3,16}$/', $nick);
+}
+
+// Санитизация строки для записи в JSON (безопасное хранение)
+function sanitizeInput(string $value): string {
+    return htmlspecialchars(strip_tags(trim($value)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+}
 
 // ========== СОЗДАНИЕ ПЛАТЕЖА ДЛЯ КЕЙСА ==========
 if ($action === 'create_case_payment') {
@@ -20,6 +32,12 @@ if ($action === 'create_case_payment') {
         echo json_encode(['success' => false, 'response' => 'Заполните ник и email']);
         exit;
     }
+    if (!validateNickname($customer)) {
+        echo json_encode(['success' => false, 'response' => 'Ник должен содержать только латиницу, цифры и _, от 3 до 16 символов']);
+        exit;
+    }
+    $customer = sanitizeInput($customer);
+    $email    = sanitizeInput($email);
 
     $params = [
         'customer'    => $customer,
@@ -40,24 +58,29 @@ if ($action === 'create_case_payment') {
 
     // ===== ТЕСТОВЫЙ РЕЖИМ =====
     if (isTestMode()) {
-        $fakeId = -1 * time(); // уникальный отрицательный ID
-        $payments = loadPayments();
-        $payments[$fakeId] = [
-            'customer'  => $customer,
-            'case_id'   => $caseId,
-            'case_name' => 'Кейс (тест)',
-            'status'    => 'paid',
-            'used'      => false,
-            'cost'      => 0,
-            'created_at'=> date('Y-m-d H:i:s'),
-            'spins_total' => $quantity,
-            'spins_left'  => $quantity,
-            'won_items'   => [],
-            'pending_item'      => null,
-            'pending_item_id'   => null,
-            'pending_amount'    => null,
-        ];
-        savePayments($payments);
+        $fakeId = -1 * time();
+        $saved = withPaymentsLock(function(&$payments) use ($fakeId, $customer, $caseId, $quantity) {
+            $payments[$fakeId] = [
+                'customer'  => $customer,
+                'case_id'   => $caseId,
+                'case_name' => 'Кейс (тест)',
+                'status'    => 'paid',
+                'used'      => false,
+                'cost'      => 0,
+                'created_at'=> date('Y-m-d H:i:s'),
+                'spins_total' => $quantity,
+                'spins_left'  => $quantity,
+                'won_items'   => [],
+                'pending_item'      => null,
+                'pending_item_id'   => null,
+                'pending_amount'    => null,
+            ];
+            return true;
+        });
+        if (!$saved) {
+            echo json_encode(['success' => false, 'response' => 'Ошибка записи платежа']);
+            exit;
+        }
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $url = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/shop/roulette.php?payment_id=' . $fakeId;
         echo json_encode(['success' => true, 'response' => ['url' => $url]]);
@@ -78,23 +101,24 @@ if ($action === 'create_case_payment') {
         $result['response']['url'] = str_replace('__PAYMENT_ID__', $paymentId, $result['response']['url']);
 
         // Сохраняем в payments.json (статус pending — webhook обновит на paid)
-        $payments = loadPayments();
-        $payments[$paymentId] = [
-            'customer'  => $customer,
-            'case_id'   => $caseId,
-            'case_name' => $result['response']['payment']['products'][0]['name'] ?? 'Кейс',
-            'status'    => 'pending',
-            'used'      => false,
-            'cost'      => $result['response']['payment']['cost'] ?? 0,
-            'created_at'=> date('Y-m-d H:i:s'),
-            'spins_total' => $quantity,
-            'spins_left'  => $quantity,
-            'won_items'   => [],
-            'pending_item'      => null,
-            'pending_item_id'   => null,
-            'pending_amount'    => null,
-        ];
-        savePayments($payments);
+        withPaymentsLock(function(&$payments) use ($paymentId, $customer, $caseId, $result, $quantity) {
+            $payments[$paymentId] = [
+                'customer'  => $customer,
+                'case_id'   => $caseId,
+                'case_name' => $result['response']['payment']['products'][0]['name'] ?? 'Кейс',
+                'status'    => 'pending',
+                'used'      => false,
+                'cost'      => $result['response']['payment']['cost'] ?? 0,
+                'created_at'=> date('Y-m-d H:i:s'),
+                'spins_total' => $quantity,
+                'spins_left'  => $quantity,
+                'won_items'   => [],
+                'pending_item'      => null,
+                'pending_item_id'   => null,
+                'pending_amount'    => null,
+            ];
+            return true;
+        });
     }
 
     echo json_encode($result);
@@ -140,28 +164,32 @@ if ($action === 'check_payment') {
     $isPaid = ($payment['status'] ?? 0) == 2;
 
     if ($isPaid) {
-        // Автоматически сохраняем в payments.json
-        $payments = loadPayments();
-        if (!isset($payments[$paymentId])) {
-            $payments[$paymentId] = [
-                'customer' => $payment['customer'] ?? '',
-                'case_id' => 0,
-                'case_name' => 'Кейс',
-                'status' => 'paid',
-                'used' => false,
-                'cost' => $payment['cost'] ?? 0,
-                'created_at' => $payment['created_at'] ?? date('Y-m-d H:i:s'),
-                'spins_total' => 1,
-                'spins_left'  => 1,
-                'won_items'   => [],
-                'pending_item'      => null,
-                'pending_item_id'   => null,
-                'pending_amount'    => null,
-            ];
-        } elseif ($payments[$paymentId]['status'] === 'pending') {
-            $payments[$paymentId]['status'] = 'paid';
+        // Автоматически сохраняем в payments.json (атомарно)
+        $saved = withPaymentsLock(function(&$payments) use ($paymentId, $payment) {
+            if (!isset($payments[$paymentId])) {
+                $payments[$paymentId] = [
+                    'customer' => $payment['customer'] ?? '',
+                    'case_id' => 0,
+                    'case_name' => 'Кейс',
+                    'status' => 'paid',
+                    'used' => false,
+                    'cost' => $payment['cost'] ?? 0,
+                    'created_at' => $payment['created_at'] ?? date('Y-m-d H:i:s'),
+                    'spins_total' => 1,
+                    'spins_left'  => 1,
+                    'won_items'   => [],
+                    'pending_item'      => null,
+                    'pending_item_id'   => null,
+                    'pending_amount'    => null,
+                ];
+            } elseif ($payments[$paymentId]['status'] === 'pending') {
+                $payments[$paymentId]['status'] = 'paid';
+            }
+            return true;
+        });
+        if (!$saved) {
+            error_log('check_payment: не удалось сохранить payment ' . $paymentId);
         }
-        savePayments($payments);
     }
 
     echo json_encode([
@@ -215,65 +243,76 @@ if ($action === 'resolve_spin') {
         exit;
     }
 
-    $payments = loadPayments();
-    if (!isset($payments[$paymentId])) {
-        echo json_encode(['success' => false, 'response' => 'Платёж не найден']);
+    // Rate limit: 10 запросов за 30 секунд на payment_id
+    if (!checkRateLimit('resolve_' . $paymentId, 10, 30)) {
+        echo json_encode(['success' => false, 'response' => 'Слишком много запросов, повторите позже']);
         exit;
     }
 
-    $payment = &$payments[$paymentId];
+    $response = null;
+    $locked = withPaymentsLock(function(&$payments) use ($paymentId, &$response) {
+        if (!isset($payments[$paymentId])) {
+            $response = ['success' => false, 'response' => 'Платёж не найден'];
+            return true;
+        }
 
-    // Миграция старых платежей (до multi-spin)
-    $payment['spins_left']   ??= 1;
-    $payment['spins_total']  ??= 1;
-    $payment['won_items']    ??= [];
-    $payment['pending_item']    ??= null;
-    $payment['pending_item_id'] ??= null;
-    $payment['pending_amount']  ??= null;
+        $p = &$payments[$paymentId];
 
-    // Если платёж завис в старом статусе 'resolved' (прерванный спин) — возвращаем в paid
-    if ($payment['status'] === 'resolved') {
-        $payment['status'] = 'paid';
-        savePayments($payments);
-    }
+        // Миграция старых платежей (до multi-spin)
+        $p['spins_left']   ??= 1;
+        $p['spins_total']  ??= 1;
+        $p['won_items']    ??= [];
+        $p['pending_item']    ??= null;
+        $p['pending_item_id'] ??= null;
+        $p['pending_amount']  ??= null;
 
-    if ($payment['spins_left'] <= 0) {
-        echo json_encode(['success' => false, 'response' => 'Все открытия уже использованы']);
+        // Если платёж завис в старом статусе 'resolved' (прерванный спин) — возвращаем в paid
+        if ($p['status'] === 'resolved') {
+            $p['status'] = 'paid';
+        }
+
+        if ($p['spins_left'] <= 0) {
+            $response = ['success' => false, 'response' => 'Все открытия уже использованы'];
+            return true;
+        }
+        if ($p['status'] !== 'paid') {
+            $response = ['success' => false, 'response' => 'Платёж не оплачен'];
+            return true;
+        }
+        if ($p['pending_item'] !== null) {
+            $response = ['success' => false, 'response' => 'Уже выполняется открытие'];
+            return true;
+        }
+
+        $caseData = loadCaseItems((int)$p['case_id']);
+        if (!$caseData || empty($caseData['items'])) {
+            $response = ['success' => false, 'response' => 'Ошибка загрузки кейса'];
+            return true;
+        }
+
+        $wonItem = weightedRandom($caseData['items']);
+        $p['pending_item']    = $wonItem['name'];
+        $p['pending_item_id'] = $wonItem['item_id'];
+        $p['pending_amount']  = $wonItem['amount'] ?? 1;
+
+        $response = [
+            'success' => true,
+            'item' => [
+                'name'    => $wonItem['name'],
+                'chance'  => $wonItem['chance'],
+                'item_id' => $wonItem['item_id'],
+                'amount'  => $wonItem['amount'] ?? 1,
+            ],
+            'spins_left' => $p['spins_left'],
+        ];
+        return true;
+    });
+
+    if (!$locked) {
+        echo json_encode(['success' => false, 'response' => 'Ошибка блокировки файла платежей']);
         exit;
     }
-    if ($payment['status'] !== 'paid') {
-        echo json_encode(['success' => false, 'response' => 'Платёж не оплачен']);
-        exit;
-    }
-    if ($payment['pending_item'] !== null) {
-        echo json_encode(['success' => false, 'response' => 'Уже выполняется открытие']);
-        exit;
-    }
-
-    $caseData = loadCaseItems((int)$payment['case_id']);
-    if (!$caseData || empty($caseData['items'])) {
-        echo json_encode(['success' => false, 'response' => 'Ошибка загрузки кейса']);
-        exit;
-    }
-
-    // Выбираем предмет
-    $wonItem = weightedRandom($caseData['items']);
-    $payment['pending_item']    = $wonItem['name'];
-    $payment['pending_item_id'] = $wonItem['item_id'];
-    $payment['pending_amount']  = $wonItem['amount'] ?? 1;
-
-    savePayments($payments);
-
-    echo json_encode([
-        'success' => true,
-        'item' => [
-            'name'    => $wonItem['name'],
-            'chance'  => $wonItem['chance'],
-            'item_id' => $wonItem['item_id'],
-            'amount'  => $wonItem['amount'] ?? 1,
-        ],
-        'spins_left' => $payment['spins_left'],
-    ]);
+    echo json_encode($response);
     exit;
 }
 
@@ -285,115 +324,125 @@ if ($action === 'spin_case') {
         exit;
     }
 
-    $payments = loadPayments();
-    if (!isset($payments[$paymentId])) {
-        echo json_encode(['success' => false, 'response' => 'Платёж не найден']);
+    // Rate limit: 10 запросов за 30 секунд на payment_id
+    if (!checkRateLimit('spin_' . $paymentId, 10, 30)) {
+        echo json_encode(['success' => false, 'response' => 'Слишком много запросов, повторите позже']);
         exit;
     }
 
-    $payment = &$payments[$paymentId];
+    $response = null;
+    $locked = withPaymentsLock(function(&$payments) use ($paymentId, &$response) {
+        if (!isset($payments[$paymentId])) {
+            $response = ['success' => false, 'response' => 'Платёж не найден'];
+            return true;
+        }
 
-    // Миграция старых платежей (до multi-spin)
-    $payment['spins_left']   ??= 1;
-    $payment['spins_total']  ??= 1;
-    $payment['won_items']    ??= [];
-    $payment['pending_item']    ??= null;
-    $payment['pending_item_id'] ??= null;
-    $payment['pending_amount']  ??= null;
+        $p = &$payments[$paymentId];
 
-    if ($payment['spins_left'] <= 0) {
-        echo json_encode(['success' => false, 'response' => 'Все открытия уже использованы']);
-        exit;
-    }
-    if ($payment['pending_item'] === null) {
-        echo json_encode(['success' => false, 'response' => 'Сначала выберите предмет (resolve_spin)']);
-        exit;
-    }
+        // Миграция старых платежей (до multi-spin)
+        $p['spins_left']   ??= 1;
+        $p['spins_total']  ??= 1;
+        $p['won_items']    ??= [];
+        $p['pending_item']    ??= null;
+        $p['pending_item_id'] ??= null;
+        $p['pending_amount']  ??= null;
 
-    $customer   = $payment['customer'];
-    $wonItemId  = $payment['pending_item_id'];
-    $wonName    = $payment['pending_item'];
-    $itemAmount = $payment['pending_amount'] ?? 1;
+        if ($p['spins_left'] <= 0) {
+            $response = ['success' => false, 'response' => 'Все открытия уже использованы'];
+            return true;
+        }
+        if ($p['pending_item'] === null) {
+            $response = ['success' => false, 'response' => 'Сначала выберите предмет (resolve_spin)'];
+            return true;
+        }
 
-    // Ищем шаблон give-команды
-    $caseData = loadCaseItems((int)$payment['case_id']);
-    $giveTemplate = null;
-    if ($caseData) {
-        foreach ($caseData['product']['commands'] as $cmd) {
-            // Ищем give команду: give <игрок> <предмет> [количество]
-            if (preg_match('/^(minecraft:)?give\s+\S+\s+/i', $cmd, $m)) {
-                // Заменяем placeholders в шаблоне, оставляя место под item_id
-                $giveTemplate = preg_replace(
-                    '/\{player\}|\{user\}|\{username\}|\{amount\}/i',
-                    $customer,
-                    $cmd
-                );
-                // Убираем последнее слово (item_id) и количество, чтобы подставить свои
-                $parts = preg_split('/\s+/', $giveTemplate);
-                if (count($parts) >= 3) {
-                    // give <игрок> ... — оставляем give + customer, остальное заменяем
-                    $giveTemplate = $parts[0] . ' ' . $parts[1] . ' ';
+        $customer   = $p['customer'];
+        $wonItemId  = $p['pending_item_id'];
+        $wonName    = $p['pending_item'];
+        $itemAmount = $p['pending_amount'] ?? 1;
+
+        // Ищем шаблон give-команды
+        $caseData = loadCaseItems((int)$p['case_id']);
+        $giveTemplate = null;
+        if ($caseData) {
+            foreach ($caseData['product']['commands'] as $cmd) {
+                if (preg_match('/^(minecraft:)?give\s+\S+\s+/i', $cmd, $m)) {
+                    $giveTemplate = preg_replace(
+                        '/\{player\}|\{user\}|\{username\}|\{amount\}/i',
+                        $customer,
+                        $cmd
+                    );
+                    $parts = preg_split('/\s+/', $giveTemplate);
+                    if (count($parts) >= 3) {
+                        $giveTemplate = $parts[0] . ' ' . $parts[1] . ' ';
+                    }
+                    break;
                 }
-                break;
             }
         }
-    }
 
-    $rconSuccess = false;
-    $rconResult  = '';
+        // RCON (выполняем до сохранения, чтобы не блокировать файл надолго)
+        // Но savePayments внутри withPaymentsLock сохранит корректное состояние
+        $rconSuccess = false;
+        $rconResult  = '';
 
-    if ($giveTemplate && $wonItemId) {
-        try {
-            require_once __DIR__ . '/rcon.php';
-            $rcon = new MinecraftRcon(RCON_HOST, RCON_PORT, RCON_PASSWORD, RCON_TIMEOUT);
-            $rcon->connect();
-            // Используем item_id и количество из выигранного предмета
-            $cmd = $giveTemplate . $wonItemId . ' ' . $itemAmount;
-            $rconResult = rtrim($rcon->command($cmd));
-            $rcon->disconnect();
-            $rconSuccess = true;
-        } catch (Exception $e) {
-            $rconResult = 'RCON: внутренняя ошибка сервера';
+        if ($giveTemplate && $wonItemId) {
+            try {
+                require_once __DIR__ . '/rcon.php';
+                $rcon = new MinecraftRcon(RCON_HOST, RCON_PORT, RCON_PASSWORD, RCON_TIMEOUT);
+                $rcon->connect();
+                $cmd = $giveTemplate . $wonItemId . ' ' . $itemAmount;
+                $rconResult = rtrim($rcon->command($cmd));
+                $rcon->disconnect();
+                $rconSuccess = true;
+            } catch (Exception $e) {
+                $rconResult = 'RCON: внутренняя ошибка сервера';
+            }
+        } else {
+            $rconResult = 'Команда для выдачи не настроена в товаре';
         }
-    } else {
-        $rconResult = 'Команда для выдачи не настроена в товаре';
+
+        // Фиксируем выигрыш
+        $p['spins_left']--;
+        $p['won_items'][] = [
+            'item'       => $wonName,
+            'item_id'    => $wonItemId,
+            'amount'     => $itemAmount,
+            'rcon_success' => $rconSuccess,
+            'rcon_response' => $rconResult,
+            'won_at'     => date('Y-m-d H:i:s'),
+        ];
+        $p['pending_item']    = null;
+        $p['pending_item_id'] = null;
+        $p['pending_amount']  = null;
+
+        if ($p['spins_left'] <= 0) {
+            $p['status'] = 'used';
+            $p['used']   = true;
+        }
+
+        $response = [
+            'success'     => true,
+            'spins_left'  => $p['spins_left'],
+            'spins_total' => $p['spins_total'],
+            'all_used'    => $p['spins_left'] <= 0,
+            'item' => [
+                'name'    => $wonName,
+                'amount'  => $itemAmount,
+            ],
+            'rcon' => [
+                'success' => $rconSuccess,
+                'response' => $rconResult,
+            ],
+        ];
+        return true;
+    });
+
+    if (!$locked) {
+        echo json_encode(['success' => false, 'response' => 'Ошибка блокировки файла платежей']);
+        exit;
     }
-
-    // Фиксируем выигрыш
-    $payment['spins_left']--;
-    $payment['won_items'][] = [
-        'item'       => $wonName,
-        'item_id'    => $wonItemId,
-        'amount'     => $itemAmount,
-        'rcon_success' => $rconSuccess,
-        'rcon_response' => $rconResult,
-        'won_at'     => date('Y-m-d H:i:s'),
-    ];
-    $payment['pending_item']    = null;
-    $payment['pending_item_id'] = null;
-    $payment['pending_amount']  = null;
-
-    if ($payment['spins_left'] <= 0) {
-        $payment['status'] = 'used';
-        $payment['used']   = true;
-    }
-
-    savePayments($payments);
-
-    echo json_encode([
-        'success'     => true,
-        'spins_left'  => $payment['spins_left'],
-        'spins_total' => $payment['spins_total'],
-        'all_used'    => $payment['spins_left'] <= 0,
-        'item' => [
-            'name'    => $wonName,
-            'amount'  => $itemAmount,
-        ],
-        'rcon' => [
-            'success' => $rconSuccess,
-            'response' => $rconResult,
-        ],
-    ]);
+    echo json_encode($response);
     exit;
 }
 
@@ -415,6 +464,12 @@ if ($action === 'create_payment') {
         echo json_encode(['success' => false, 'response' => 'Заполните ник и email']);
         exit;
     }
+    if (!validateNickname($customer)) {
+        echo json_encode(['success' => false, 'response' => 'Ник должен содержать только латиницу, цифры и _, от 3 до 16 символов']);
+        exit;
+    }
+    $customer = sanitizeInput($customer);
+    $email    = sanitizeInput($email);
 
     if (is_string($productsRaw)) {
         $productsArr = json_decode($productsRaw, true);
@@ -513,7 +568,7 @@ if ($action === 'create_payment') {
             "method" => "GET",
             "header" => "Shop-Key: " . SHOP_KEY . "\r\n"
         ],
-        "ssl" => ["verify_peer" => true, "verify_peer_name" => true]
+        "ssl" => sslContext()
     ];
 
     $context = stream_context_create($opts);

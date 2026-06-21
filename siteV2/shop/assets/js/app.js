@@ -194,6 +194,7 @@ $(function () {
                 setupFilter();
             }
         } catch (e) {
+            console.error('loadProducts failed:', e);
             $('#productsGrid').html('<div class="col-12 text-center"><p>Ошибка загрузки товаров</p></div>');
         }
     }
