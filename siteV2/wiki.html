@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>База знаний — Minecraft Times</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="tailwind.css">
+    <style>
+        /*
+         * Palette — GitHub Dark / VS Code Dark+
+         * bg:        #0d1117  (github page bg)
+         * surface:   #161b22  (github card)
+         * surface2:  #1c2128  (slightly lighter panel)
+         * border:    #30363d  (github border)
+         * border2:   #21262d  (subtle border)
+         * accent:    #58a6ff  (github link blue)
+         * accent2:   #79c0ff  (lighter blue)
+         * text:      #e6edf3  (github primary text)
+         * text-muted:#8b949e  (github secondary text)
+         * text-dim:  #6e7681  (github tertiary)
+         * green:     #3fb950  (github green)
+         * yellow:    #d29922  (github yellow)
+         * red:       #f85149  (github red)
+         * purple:    #bc8cff  (github purple)
+         * orange:    #d18616  (github orange)
+         */
+
+        * { font-family: 'Montserrat', sans-serif; box-sizing: border-box; }
+
+        body {
+            background-color: #0d1117;
+            color: #e6edf3;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* ── Fixed background layers ── */
+        #firefly-canvas {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 0;
+        }
+        .stars-layer {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 0;
+            background:
+                radial-gradient(1px 1px at 10% 7%,  rgba(230,237,243,0.45) 0%, transparent 100%),
+                radial-gradient(1px 1px at 27% 18%, rgba(230,237,243,0.3)  0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 44% 4%, rgba(230,237,243,0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 59% 13%, rgba(230,237,243,0.3)  0%, transparent 100%),
+                radial-gradient(1px 1px at 71% 3%,  rgba(230,237,243,0.4)  0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 87% 10%, rgba(230,237,243,0.4) 0%, transparent 100%),
+                radial-gradient(1px 1px at 4%  31%, rgba(230,237,243,0.25) 0%, transparent 100%),
+                radial-gradient(1px 1px at 34% 37%, rgba(230,237,243,0.3)  0%, transparent 100%),
+                radial-gradient(1px 1px at 77% 26%, rgba(230,237,243,0.28) 0%, transparent 100%),
+                radial-gradient(1px 1px at 91% 40%, rgba(230,237,243,0.38) 0%, transparent 100%),
+                radial-gradient(1px 1px at 17% 54%, rgba(230,237,243,0.22) 0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 54% 47%, rgba(230,237,243,0.35) 0%, transparent 100%),
+                radial-gradient(1px 1px at 65% 61%, rgba(230,237,243,0.28) 0%, transparent 100%),
+                radial-gradient(1px 1px at 81% 57%, rgba(230,237,243,0.32) 0%, transparent 100%),
+                radial-gradient(1px 1px at 8%  73%, rgba(230,237,243,0.22) 0%, transparent 100%),
+                radial-gradient(1px 1px at 41% 77%, rgba(230,237,243,0.28) 0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 94% 71%, rgba(230,237,243,0.38) 0%, transparent 100%);
+        }
+        .moon {
+            position: fixed; top: 60px; right: 120px;
+            width: 72px; height: 72px; border-radius: 50%;
+            background: radial-gradient(circle at 38% 38%, #fffbe0, #f5d97a 40%, #d4a83a 80%);
+            box-shadow:
+                0 0 18px 6px  rgba(245,210,100,0.2),
+                0 0 55px 18px rgba(220,180,50,0.09),
+                0 0 100px 35px rgba(200,160,30,0.05);
+            pointer-events: none; z-index: 1;
+        }
+        .trees-layer {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 220px; pointer-events: none; z-index: 1;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 220' preserveAspectRatio='xMidYMax slice'%3E%3Cpath fill='%230a0e16' d='M0,220 L0,140 L20,140 L20,100 L30,100 L30,80 L40,80 L40,60 L50,60 L50,80 L60,80 L60,40 L70,40 L70,60 L75,60 L75,30 L85,30 L85,60 L90,60 L90,50 L100,50 L100,70 L110,70 L110,50 L120,50 L120,80 L130,80 L130,50 L140,50 L140,30 L150,30 L150,50 L155,50 L155,20 L165,20 L165,50 L170,50 L170,60 L180,60 L180,40 L190,40 L190,70 L200,70 L200,80 L210,80 L210,60 L220,60 L220,40 L230,40 L230,25 L240,25 L240,40 L250,40 L250,60 L260,60 L260,80 L270,80 L270,100 L280,100 L280,80 L285,80 L285,50 L295,50 L295,30 L305,30 L305,50 L310,50 L310,70 L320,70 L320,50 L330,50 L330,60 L340,60 L340,80 L350,80 L350,60 L360,60 L360,40 L370,40 L370,20 L380,20 L380,40 L390,40 L390,60 L400,60 L400,80 L410,80 L410,60 L420,60 L420,50 L430,50 L430,40 L440,40 L440,30 L450,30 L450,40 L460,40 L460,60 L470,60 L470,80 L480,80 L480,100 L490,100 L490,80 L500,80 L500,60 L510,60 L510,40 L520,40 L520,25 L530,25 L530,40 L540,40 L540,60 L550,60 L550,80 L560,80 L560,50 L570,50 L570,30 L580,30 L580,50 L590,50 L590,70 L600,70 L600,90 L610,90 L610,70 L620,70 L620,50 L630,50 L630,30 L640,30 L640,15 L650,15 L650,30 L660,30 L660,50 L670,50 L670,60 L680,60 L680,80 L690,80 L690,60 L700,60 L700,40 L710,40 L710,60 L720,60 L720,80 L730,80 L730,60 L740,60 L740,40 L750,40 L750,20 L760,20 L760,40 L770,40 L770,60 L780,60 L780,80 L790,80 L790,60 L800,60 L800,50 L810,50 L810,40 L820,40 L820,30 L830,30 L830,50 L840,50 L840,70 L850,70 L850,90 L860,90 L860,70 L870,70 L870,50 L880,50 L880,35 L890,35 L890,50 L900,50 L900,60 L910,60 L910,80 L920,80 L920,60 L930,60 L930,40 L940,40 L940,20 L950,20 L950,40 L960,40 L960,60 L970,60 L970,80 L980,80 L980,60 L990,60 L990,50 L1000,50 L1000,70 L1010,70 L1010,50 L1020,50 L1020,30 L1030,30 L1030,50 L1040,50 L1040,60 L1050,60 L1050,80 L1060,80 L1060,60 L1070,60 L1070,40 L1080,40 L1080,25 L1090,25 L1090,40 L1100,40 L1100,60 L1110,60 L1110,80 L1120,80 L1120,60 L1130,60 L1130,50 L1140,50 L1140,40 L1150,40 L1150,30 L1160,30 L1160,50 L1170,50 L1170,70 L1180,70 L1180,90 L1190,90 L1190,70 L1200,70 L1200,50 L1210,50 L1210,35 L1220,35 L1220,50 L1230,50 L1230,60 L1240,60 L1240,80 L1250,80 L1250,60 L1260,60 L1260,40 L1270,40 L1270,25 L1280,25 L1280,40 L1290,40 L1290,60 L1300,60 L1300,80 L1310,80 L1310,100 L1320,100 L1320,80 L1330,80 L1330,60 L1340,60 L1340,80 L1350,80 L1350,100 L1360,100 L1360,120 L1370,120 L1370,140 L1380,140 L1380,160 L1400,160 L1440,160 L1440,220 Z'/%3E%3C/svg%3E") bottom/cover no-repeat;
+        }
+        .mist-layer {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 80px; pointer-events: none; z-index: 2;
+            background: linear-gradient(to top, rgba(13,17,23,0.6) 0%, transparent 100%);
+        }
+
+        nav, section, footer { position: relative; z-index: 10; }
+
+        /* ── Nav ── */
+        nav {
+            background: rgba(13,17,23,0.92);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid #30363d;
+        }
+        .nav-logo { color: #e6edf3; font-weight: 800; font-size: 1.15rem; text-decoration: none; }
+        .nav-link { color: #8b949e; font-size: 0.9rem; text-decoration: none; transition: color .2s; }
+        .nav-link:hover { color: #e6edf3; }
+
+        /* ── Sidebar ── */
+        .sidebar-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+        }
+        .sidebar-label {
+            font-size: 0.7rem; font-weight: 700; letter-spacing: .07em;
+            text-transform: uppercase; color: #6e7681;
+            padding: 0 10px; margin-bottom: 6px; display: block;
+        }
+        .wiki-nav-link {
+            display: block; padding: 6px 10px;
+            color: #8b949e; font-size: 0.86rem;
+            border-left: 2px solid transparent;
+            border-radius: 0 6px 6px 0;
+            text-decoration: none; transition: all .18s;
+        }
+        .wiki-nav-link:hover { color: #e6edf3; background: #1c2128; border-left-color: #30363d; }
+        .wiki-nav-link.active { color: #58a6ff; background: rgba(88,166,255,0.08); border-left-color: #58a6ff; }
+        .wiki-nav-section {
+            font-size: 0.7rem; font-weight: 700; letter-spacing: .07em;
+            text-transform: uppercase; color: #bc8cff;
+            padding: 6px 10px 2px; margin-top: 8px; display: block;
+            border-top: 1px solid #21262d;
+        }
+
+        /* ── Content card ── */
+        .content-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+        }
+        .content-card p, .content-card li, .content-card td { color: #c9d1d9; }
+
+        /* ── Headings ── */
+        .article-h2 {
+            font-size: 1.35rem; font-weight: 800; color: #e6edf3;
+            margin-bottom: 1rem; padding-bottom: .5rem;
+            border-bottom: 1px solid #21262d;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .article-h4 {
+            font-size: 0.92rem; font-weight: 700; color: #8b949e;
+            margin: 1.2rem 0 .4rem; text-transform: uppercase;
+            letter-spacing: .05em; font-size: .8rem;
+        }
+
+        /* ── Plugin banner ── */
+        .plugin-banner {
+            background: #1c2128;
+            border: 1px solid #30363d;
+            border-left: 3px solid #bc8cff;
+            border-radius: 8px; padding: 14px 18px; margin-bottom: 2rem;
+        }
+        .plugin-banner h2 { font-size: 1.15rem; font-weight: 800; color: #bc8cff; margin: 0 0 3px; }
+        .plugin-banner p { color: #6e7681; font-size: .84rem; margin: 0; }
+
+        /* ── Tables ── */
+        .night-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+        .night-table thead tr { background: #1c2128; }
+        .night-table thead th {
+            text-align: left; padding: 9px 14px; color: #8b949e;
+            font-weight: 600; border-bottom: 1px solid #30363d; font-size: .82rem;
+            text-transform: uppercase; letter-spacing: .04em;
+        }
+        .night-table tbody tr { border-bottom: 1px solid #21262d; }
+        .night-table tbody tr:hover { background: #1c2128; }
+        .night-table tbody td { padding: 8px 14px; color: #c9d1d9; }
+        .night-table-wrap { border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+
+        /* ── Callouts ── */
+        .callout-warn {
+            background: rgba(210,153,34,0.1);
+            border: 1px solid rgba(210,153,34,0.35);
+            border-left: 3px solid #d29922;
+            border-radius: 6px; padding: 11px 15px; margin-top: 1rem;
+        }
+        .callout-warn .ct { color: #d29922; font-weight: 700; font-size: .88rem; margin-bottom: 5px; }
+
+        .callout-bug {
+            background: rgba(248,81,73,0.08);
+            border: 1px solid rgba(248,81,73,0.3);
+            border-left: 3px solid #f85149;
+            border-radius: 6px; padding: 11px 15px; margin-top: 1rem;
+        }
+        .callout-bug .ct { color: #f85149; font-weight: 700; font-size: .88rem; margin-bottom: 5px; }
+
+        .callout-tip {
+            background: rgba(63,185,80,0.08);
+            border: 1px solid rgba(63,185,80,0.25);
+            border-left: 3px solid #3fb950;
+            border-radius: 6px; padding: 11px 15px; margin-top: .8rem;
+        }
+        .callout-tip p { color: #3fb950; font-size: .88rem; margin: 0; }
+
+        .callout-info {
+            background: rgba(88,166,255,0.07);
+            border: 1px solid rgba(88,166,255,0.25);
+            border-left: 3px solid #58a6ff;
+            border-radius: 6px; padding: 11px 15px; margin-top: .8rem;
+        }
+        .callout-info .ct { color: #58a6ff; font-weight: 700; font-size: .88rem; margin-bottom: 5px; }
+        .callout-info p, .callout-info li { color: #8b949e; font-size: .88rem; margin: 2px 0; }
+
+        /* ── Lists ── */
+        .night-list { list-style: none; padding: 0; margin: .5rem 0; }
+        .night-list li {
+            padding: 4px 0 4px 20px; position: relative;
+            color: #c9d1d9; font-size: .91rem; line-height: 1.6;
+        }
+        .night-list li::before { content: '▸'; position: absolute; left: 3px; color: #58a6ff; }
+        .night-list.ordered { counter-reset: li; }
+        .night-list.ordered li::before {
+            content: counter(li); counter-increment: li;
+            font-size: .74rem; font-weight: 700; color: #58a6ff; left: 0;
+        }
+
+        /* ── Code ── */
+        code {
+            background: #1c2128; color: #79c0ff;
+            padding: 1px 7px; border-radius: 5px;
+            font-size: .87em; font-family: 'Courier New', monospace;
+            border: 1px solid #30363d;
+        }
+
+        /* ── Images ── */
+        .wiki-img {
+            width: 100%; border-radius: 7px;
+            border: 1px solid #30363d; margin: 1rem 0; display: block;
+        }
+
+        /* ── Misc ── */
+        .chance { color: #d29922; font-weight: 600; }
+        .check  { color: #3fb950; }
+        .article-sep { border: none; border-top: 1px solid #21262d; margin: 2.5rem 0; }
+        .scroll-target { scroll-margin-top: 88px; }
+
+        /* ── Rune step badge ── */
+        .step-badge {
+            display: inline-flex; align-items: center; gap: 7px;
+            background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.25);
+            color: #58a6ff; font-size: .8rem; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px; margin-bottom: .6rem;
+            text-transform: uppercase; letter-spacing: .05em;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+        #mobile-menu { background: #161b22; border-top: 1px solid #30363d; }
+
+        footer { background: #0d1117; border-top: 1px solid #21262d; }
+    </style>
+</head>
+<body>
+
+<div class="stars-layer"></div>
+<div class="moon"></div>
+<canvas id="firefly-canvas"></canvas>
+<div class="trees-layer"></div>
+<div class="mist-layer"></div>
+
+<!-- Nav -->
+<nav class="fixed top-0 left-0 right-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+            <a href="index.html" class="nav-logo">Minecraft Times</a>
+            <div class="hidden md:flex items-center space-x-7">
+                <a href="wiki.html" class="nav-link">Вики</a>
+                <a href="rules.html" class="nav-link">Правила</a>
+                <a href="shop/" class="nav-link">Донат</a>
+            </div>
+            <button id="mobile-menu-btn" class="md:hidden" style="color:#8b949e;background:none;border:none;cursor:pointer;" aria-label="Открыть меню">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden">
+        <div class="px-4 py-3 space-y-3">
+            <a href="wiki.html" class="block nav-link">Вики</a>
+            <a href="rules.html" class="block nav-link">Правила</a>
+            <a href="shop/" class="block nav-link">Донат</a>
+        </div>
+    </div>
+</nav>
+
+<section class="min-h-screen pt-24 pb-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 style="font-size:1.9rem;font-weight:800;color:#e6edf3;text-align:center;margin-bottom:2rem;">База знаний</h1>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+
+            <!-- Sidebar -->
+            <aside class="lg:w-60 flex-shrink-0">
+                <div class="sidebar-card p-4 sticky top-24">
+                    <span class="sidebar-label">Статьи</span>
+                    <nav class="space-y-px">
+                        <a href="#intro"           class="wiki-nav-link active">Введение</a>
+                        <a href="#commands"        class="wiki-nav-link">Команды</a>
+                        <a href="#mods"            class="wiki-nav-link">Моды</a>
+                        <a href="#mechanics"       class="wiki-nav-link">Механики</a>
+                        <a href="#features"        class="wiki-nav-link">Особенности</a>
+                        <a href="#economy"         class="wiki-nav-link">Экономика</a>
+                        <span class="wiki-nav-section">🌊 Summer Plugin</span>
+                        <a href="#summer-fishing"  class="wiki-nav-link">🎣 Рыбные места</a>
+                        <a href="#summer-sieve"    class="wiki-nav-link">🪁 Сито</a>
+                        <a href="#summer-icecream" class="wiki-nav-link">🍦 Мороженое</a>
+                        <a href="#summer-night"    class="wiki-nav-link">🦟 Ночные создания</a>
+                        <span class="wiki-nav-section">🔮 Механики</span>
+                        <a href="#runes"           class="wiki-nav-link">🔮 Руны</a>
+                        <a href="#profiles" class="wiki-nav-link">🏛️ Боги и Профили</a>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Main -->
+            <main class="flex-1">
+                <div class="content-card p-6 md:p-8">
+
+                    <!-- Intro -->
+                    <article id="intro" class="scroll-target mb-10">
+                        <h2 class="article-h2">Введение</h2>
+                        <div class="space-y-3" style="font-size:.93rem;line-height:1.75;color:#c9d1d9;">
+                            <p>Добро пожаловать на Minecraft Times — ванильный сервер без привилегий и приватов. Здесь мы вернули классический дух Minecraft, где каждый игрок равен, а успех зависит только от твоих навыков и упорства.</p>
+                            <p>На нашем сервере вы найдете честную игру, дружное сообщество и множество возможностей для творчества и развития.</p>
+                        </div>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Commands -->
+                    <article id="commands" class="scroll-target mb-10">
+                        <h2 class="article-h2">Команды</h2>
+                        <p style="color:#8b949e;font-size:.92rem;margin-bottom:.7rem;">Основные команды, доступные на сервере:</p>
+                        <ul class="night-list">
+                            <li><code>/home</code> — Телепортация домой</li>
+                            <li><code>/sethome</code> — Установить точку дома</li>
+                            <li><code>/msg [игрок] [сообщение]</code> — Личное сообщение</li>
+                            <li><code>/skin set [Ник скина]</code> — Сменить скин</li>
+                            <li><code>/co inspect</code> — Просмотр недавних действий у блока</li>
+                            <li><code>![сообщение]</code> — Глобальный чат</li>
+                            <li><code>/cd create local [file] [name]</code> — Загрузить кастом музыку в пластинку</li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Mods -->
+                    <article id="mods" class="scroll-target mb-10">
+                        <h2 class="article-h2">Моды</h2>
+                        <p style="color:#8b949e;font-size:.92rem;margin-bottom:.7rem;">Моды доступные на сервере:</p>
+                        <ul class="night-list">
+                            <li>Simple Voice Chat</li>
+                            <li>Pat Pat</li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Mechanics -->
+                    <article id="mechanics" class="scroll-target mb-10">
+                        <h2 class="article-h2">Механики</h2>
+                        <p style="color:#8b949e;font-size:.92rem;margin-bottom:.7rem;">На сервере реализованы следующие игровые механики:</p>
+                        <ul class="night-list">
+                        <li>
+                            Игроки делятся на PvP и PvE. По умолчанию — PvE.
+                            Смена группы через @Flory987 (тг): первый раз бесплатно, далее — 19 руб.
+                            PvP игроки выделены так:
+                            <img loading="lazy" src="wiki_images_webp/9.webp" alt="PVP" style="display:inline-block;height:24px;vertical-align:middle;">
+                        </li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Features -->
+                    <article id="features" class="scroll-target mb-10">
+                        <h2 class="article-h2">Особенности</h2>
+                        <p style="color:#8b949e;font-size:.92rem;margin-bottom:.7rem;">Уникальные особенности нашего сервера:</p>
+                        <ul class="night-list">
+                            <li>Отсутствие донатных привилегий, влияющих на геймплей</li>
+                            <li>Ненавязчивый, глубокий лор</li>
+                            <li>Активное комьюнити и регулярные ивенты</li>
+                            <li>Профессиональная администрация</li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Economy -->
+                    <article id="economy" class="scroll-target mb-10">
+                        <h2 class="article-h2">Экономика</h2>
+                        <p style="color:#8b949e;font-size:.92rem;margin-bottom:.7rem;">Экономическая система сервера построена на принципах честности и баланса:</p>
+                        <ul class="night-list">
+                            <li>Естественная рыночная экономика</li>
+                            <li>Игроки сами определяют как им торговать</li>
+                            <li>Никаких аукционов</li>
+                        </ul>
+                    </article>
+
+                    <!-- ══ SUMMER PLUGIN ══ -->
+                    <hr class="article-sep">
+                    <div class="plugin-banner">
+                        <h2>🌊 SummerPlugin — Вики для игроков</h2>
+                        <p>Все летние механики сервера.</p>
+                    </div>
+
+                    <!-- Fishing -->
+                    <article id="summer-fishing" class="scroll-target mb-10">
+                        <h2 class="article-h2">🎣 Рыбалка — Рыбные места</h2>
+                        <p style="color:#8b949e;font-size:.87rem;margin-bottom:1rem;">Рыбные места — особые точки на воде, где рыба клюёт быстрее и есть шанс получить редкие предметы.</p>
+                        <img loading="lazy" src="wiki_images_webp/1.webp" alt="Рыбные места" class="wiki-img" style="width: 60%;">
+                        <h4 class="article-h4">Как это работает</h4>
+                        <ul class="night-list">
+                            <li>По всему миру автоматически появляются рыбные места — видно по кружащимся частицам над водой</li>
+                            <li>Поклёвка происходит быстрее (3–5 сек вместо обычных 5–30 сек)</li>
+                            <li>При поклёвке нужно вовремя подсечь (ПКМ) — появится <span style="color:#3fb950">«✔️ Подсечка!»</span> или <span style="color:#f85149">«✘ Рыба сорвалась!»</span></li>
+                            <li>Место живёт несколько минут, потом исчезает и появляется в другом месте</li>
+                        </ul>
+                        <h4 class="article-h4">Особые предметы (шанс вместо обычной рыбы)</h4>
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead><tr><th>Предмет</th><th>Шанс</th></tr></thead>
+                                <tbody>
+                                    <tr><td>🕶 Солнечные очки</td><td class="chance">4%</td></tr>
+                                    <tr><td>🌱 Священное семечко</td><td class="chance">2%</td></tr>
+                                    <tr><td>🐚 Ракушечный амулет</td><td class="chance">1%</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="callout-tip"><p>💡 Выпавшие предметы — ценные вещи, которые можно продать другим игрокам.</p></div>
+                        <h4 class="article-h4">Советы</h4>
+                        <ul class="night-list">
+                            <li>Частицы рыбного места видны издалека — плыви на них</li>
+                            <li>Рыбные места появляются только в достаточно глубокой воде</li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Sieve -->
+                    <article id="summer-sieve" class="scroll-target mb-10">
+                        <h2 class="article-h2">🪣 Сито — Просеивание</h2>
+                        <p style="color:#8b949e;font-size:.87rem;margin-bottom:1rem;">Сито — кастомный инструмент для поиска ресурсов в песке и гравии прямо на пляже.</p>
+                        <img loading="lazy" src="wiki_images_webp/2.webp" alt="Как получить сито" class="wiki-img">
+                        <h4 class="article-h4">Как пользоваться</h4>
+                        <ul class="night-list ordered">
+                            <li>Возьми сито в руку</li>
+                            <li>Встань рядом с водой (обязательно!)</li>
+                            <li>Нажми ПКМ по блоку Песка или Гравия</li>
+                            <li>Появится мини-игра — нажимай ПКМ в нужный момент чтобы продолжить просеивание</li>
+                            <li>Через несколько секунд выпадут ресурсы</li>
+                        </ul>
+                        <h4 class="article-h4">Что выпадает</h4>
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead><tr><th>Лут</th><th>Включён по умолчанию</th></tr></thead>
+                                <tbody>
+                                    <tr><td>Глиняный шарик</td><td class="check">✅</td></tr>
+                                    <tr><td>Гравий</td><td class="check">✅</td></tr>
+                                    <tr><td>Кремень</td><td class="check">✅</td></tr>
+                                    <tr><td>Железный самородок</td><td class="check">✅</td></tr>
+                                    <tr><td>Золотой самородок</td><td class="check">✅</td></tr>
+                                    <tr><td>Изумруд</td><td class="check">✅</td></tr>
+                                    <tr><td>Алмаз</td><td class="check">✅</td></tr>
+                                    <tr><td>Осколок аметиста</td><td class="check">✅</td></tr>
+                                    <tr><td>Призмариновый осколок</td><td class="check">✅</td></tr>
+                                    <tr><td>🐚 Ракушечный амулет</td><td class="chance">1% шанс</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="callout-warn">
+                            <p class="ct">⚠️ Важно</p>
+                            <ul class="night-list" style="margin:0;">
+                                <li>Сито имеет прочность — при поломке исчезает</li>
+                                <li>Прочность видна в лоре предмета (зелёный / жёлтый / красный цвет)</li>
+                                <li>Нужно быть у воды — без воды рядом не работает</li>
+                            </ul>
+                        </div>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Ice cream -->
+                    <article id="summer-icecream" class="scroll-target mb-10">
+                        <h2 class="article-h2">🍦 Мороженое — Ледогенератор</h2>
+                        <p style="color:#8b949e;font-size:.87rem;margin-bottom:1rem;">Ледогенератор — особый блок, который производит Колотый лёд. Из него делается мороженое.</p>
+                        <img loading="lazy" src="wiki_images_webp/3.webp" alt="Как получить ледогенератор" class="wiki-img">
+                        <h4 class="article-h4">Как пользоваться</h4>
+                        <ul class="night-list ordered">
+                            <li>Поставь ледогенератор</li>
+                            <li>Нажми ПКМ пустой бутылкой по ледогенератору — получишь ❄️ Колотый лёд</li>
+                            <li>После использования ледогенератор уходит на перезарядку (по умолчанию 10 минут)</li>
+                            <li>Если кулдаун ещё идёт — увидишь «⏳ Зарядится через X:XX»</li>
+                        </ul>
+                        <h4 class="article-h4">Рецепты мороженого (бесформенный крафт)</h4>
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead><tr><th>Мороженое</th><th>Ингредиенты</th></tr></thead>
+                                <tbody>
+                                    <tr><td>🍓 Ягодное</td><td>Ягоды + Колотый лёд + Сахар + Молоко</td></tr>
+                                    <tr><td>🍉 Арбузное</td><td>Ломтик арбуза + Колотый лёд + Сахар + Молоко</td></tr>
+                                    <tr><td>🍫 Какао</td><td>Какао Бобы + Колотый лёд + Сахар + Молоко</td></tr>
+                                    <tr><td>🌟 Светлячковое</td><td>Светящиеся ягоды + Колотый лёд + Сахар + Молоко</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h4 class="article-h4">Эффект от мороженого</h4>
+                        <ul class="night-list">
+                            <li>Съешь мороженое → мини-игра: следи за температурой (ПКМ по верстаку чтобы забрать)</li>
+                            <li>Следи за температурой: нужно выйти из верстака и нажать ПКМ в голубой зоне</li>
+                            <li>Если поймал идеальную температуру (20–45°) → <span style="color:#58a6ff">«✦ Идеальная температура! Освежающее мороженое!»</span></li>
+                            <li>Обычная версия восстанавливает голод, улучшенная увеличивает время действия эффекта</li>
+                        </ul>
+                    </article>
+                    <hr class="article-sep">
+
+                    <!-- Night creatures -->
+                    <article id="summer-night" class="scroll-target mb-10">
+                        <h2 class="article-h2">🦟 Ночные создания — Комары и Светлячки</h2>
+                        <p style="color:#8b949e;font-size:.87rem;margin-bottom:1rem;">По ночам появляются рои комаров и светлячки.</p>
+                        <h4 class="article-h4">Комары 🦟</h4>
+                        <ul class="night-list">
+                            <li>Появляются ночью в виде чёрных частиц</li>
+                            <li>Появляются в игровое время 13000–23500</li>
+                            <li>Летают роем рядом с игроками — наносят урон (по умолчанию 0.5 ❤️ за удар)</li>
+                        </ul>
+                        <h4 class="article-h4">Светлячки ✨</h4>
+                        <img loading="lazy" src="wiki_images_webp/4.webp" alt="Светлячки" class="wiki-img" style="width: 60%;">
+                        <ul class="night-list">
+                            <li>Появляются ночью в виде светящихся частиц</li>
+                            <li>Можно поймать в банку — подойди вплотную с банкой для светлячков в руке</li>
+                        </ul>
+                        <h4 class="article-h4">Банка для светлячков</h4>
+                        <p style="color:#c9d1d9;font-size:.91rem;">Подойди к светлячкам с бутылкой в руке — поймаешь!</p>
+                        <div class="callout-bug">
+                            <p class="ct">🐛 Известный баг</p>
+                            <ul class="night-list" style="margin:0;">
+                                <li>Если у тебя только одна банка для светлячков — поставить её не получится</li>
+                                <li>То же самое с обычной одной бутылкой</li>
+                            </ul>
+                        </div>
+                    </article>
+
+                    <!-- ══ MECHANICS: RUNES ══ -->
+                    <hr class="article-sep">
+                    <div class="plugin-banner" style="border-left-color:#bc8cff;">
+                        <h2>🔮 Механики сервера</h2>
+                        <p>Уникальные кастомные системы.</p>
+                    </div>
+
+                    <article id="runes" class="scroll-target">
+                        <h2 class="article-h2">🔮 Руны</h2>
+                        <p style="color:#c9d1d9;font-size:.93rem;line-height:1.7;margin-bottom:1rem;">
+                            Руны — уникальная система сервера, позволяющая обойти стандартные лимиты игры и прокачать зачарования на <span style="color:#bc8cff;font-weight:700;">+1 уровень выше максимального</span>.
+                        </p>
+
+                        <h4 class="article-h4">📜 Доступные улучшения</h4>
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead>
+                                    <tr>
+                                        <th>Зачарование</th>
+                                        <th style="text-align:center;">Исходный уровень</th>
+                                        <th style="text-align:center;"></th>
+                                        <th style="text-align:center;">Улучшенный уровень</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Острота</td>
+                                        <td style="text-align:center;color:#8b949e;">V</td>
+                                        <td style="text-align:center;color:#bc8cff;">➔</td>
+                                        <td style="text-align:center;color:#bc8cff;font-weight:700;">VI</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Защита</td>
+                                        <td style="text-align:center;color:#8b949e;">IV (или V)</td>
+                                        <td style="text-align:center;color:#bc8cff;">➔</td>
+                                        <td style="text-align:center;color:#bc8cff;font-weight:700;">V (или VI)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Прочность</td>
+                                        <td style="text-align:center;color:#8b949e;">III</td>
+                                        <td style="text-align:center;color:#bc8cff;">➔</td>
+                                        <td style="text-align:center;color:#bc8cff;font-weight:700;">IV</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="callout-warn" style="margin-top:.8rem;">
+                            <p class="ct">⚠️ Важно</p>
+                            <ul class="night-list" style="margin:0;">
+                                <li>Список зачарований будет постепенно расширяться в будущих обновлениях!</li>
+                                <li>Пока что руны можно получить только в ивентах!</li>
+                            </ul>
+                        </div>
+
+                        <h4 class="article-h4" style="margin-top:1.8rem;">🔨 Пошаговая инструкция</h4>
+                        <p style="color:#8b949e;font-size:.88rem;margin-bottom:1rem;">Предмет не прокачивается мгновенно при обычном клике. Процесс проходит в два этапа с использованием <strong style="color:#c9d1d9;">Стола кузнеца</strong>.</p>
+
+                        <!-- Step 1 -->
+                        <div style="margin-bottom:1.5rem;">
+                            <div class="step-badge">🔹 Этап 1</div>
+                            <p style="color:#c9d1d9;font-size:.9rem;font-weight:600;margin:0 0 .6rem;">Снятие лимита (Интерфейс)</p>
+                            <ul class="night-list ordered">
+                                <li>Возьмите руну в руку и нажмите ПКМ по Столу кузнеца.</li>
+                            </ul>
+                            <img loading="lazy" src="wiki_images_webp/5.webp" alt="Открытие меню стола кузнеца" class="wiki-img" style="width: 60%;">
+                            <ul class="night-list ordered" style="counter-reset:li 2;">
+                                <li>В открывшемся меню разложите предметы по трём слотам:</li>
+                            </ul>
+                            <img loading="lazy" src="wiki_images_webp/6.webp" alt="Слоты стола кузнеца" class="wiki-img" style="width: 60%;">
+                            <div class="callout-info" style="margin:.6rem 0;">
+                                <p class="ct">Слоты меню</p>
+                                <ul class="night-list" style="margin:0;">
+                                    <li><strong style="color:#c9d1d9;">Слот 1</strong> — Сама Руна</li>
+                                    <li><strong style="color:#c9d1d9;">Слот 2</strong> — Предмет, который вы хотите улучшить</li>
+                                    <li><strong style="color:#c9d1d9;">Слот 3</strong> — Специальный катализатор для этого зачарования</li>
+                                </ul>
+                            </div>
+                            <ul class="night-list ordered" style="counter-reset:li 3;">
+                                <li>Заберите предмет. Теперь на нём открыт доступ к следующему уровню!</li>
+                            </ul>
+                            <img loading="lazy" src="wiki_images_webp/7.webp" alt="Предмет после снятия лимита" class="wiki-img" style="width: 60%;">
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div>
+                            <div class="step-badge">🔹 Этап 2</div>
+                            <p style="color:#c9d1d9;font-size:.9rem;font-weight:600;margin:0 0 .6rem;">Финальный апгрейд</p>
+                            <p style="color:#c9d1d9;font-size:.91rem;line-height:1.65;">
+                                Чтобы окончательно получить уровень +1, объедините изменённый предмет на <strong style="color:#e6edf3;">наковальне</strong> со второй книгой такого же максимального уровня (например, ещё одной Остротой V).
+                            </p>
+                            <img loading="lazy" src="wiki_images_webp/8.webp" alt="Объединение на наковальне" class="wiki-img" style="width: 60%;">
+                        </div>
+
+                    </article>
+                    <hr class="article-sep">
+
+                    <article id="profiles" class="scroll-target">
+                        <h2 class="article-h2">🏛️ Боги и Профили Игроков</h2>
+
+                        <p style="color:#c9d1d9;font-size:.93rem;line-height:1.7;margin-bottom:1rem;">
+                            На сервере действует уникальная система профилей, которая связана со временем в игре,
+                            социальным статусом и благословением древних Богов.
+                        </p>
+
+                        <h4 class="article-h4">👤 Как открыть профиль</h4>
+
+                        <ul class="night-list">
+                            <li><code>/profile</code> — открыть собственный профиль</li>
+                            <li>Подойти к игроку и нажать <code>Shift + ПКМ</code> — открыть его профиль</li>
+                        </ul>
+
+                        <img loading="lazy" src="wiki_images_webp/10.webp" alt="Профиль игрока" class="wiki-img" style="width:60%;">
+
+                        <h4 class="article-h4">📋 Что находится внутри профиля</h4>
+
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead>
+                                    <tr>
+                                        <th>Параметр</th>
+                                        <th>Описание</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Ник игрока</td>
+                                        <td>Имя пользователя на сервере</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Выбранный Бог</td>
+                                        <td>Покровитель персонажа</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ранг</td>
+                                        <td>Статус, зависящий от времени игры</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Отыгранное время</td>
+                                        <td>Количество часов на сервере</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Социальный рейтинг</td>
+                                        <td>Репутация среди игроков</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Таймы ⌛</td>
+                                        <td>Основная внутриигровая валюта</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Купоны 🎟️</td>
+                                        <td>Донат-валюта сервера</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <img loading="lazy" src="wiki_images_webp/11.webp" alt="Профиль игрока" class="wiki-img" style="width:60%;">
+
+                        <h4 class="article-h4">🌟 Система Богов и Алтари</h4>
+
+                        <ul class="night-list">
+                            <li>При первом входе на сервер игрок случайным образом получает одного из Богов-покровителей.</li>
+                            <li>Каждый Бог имеет собственный алтарь и уникальную постройку в мире.</li>
+                            <li>Алтари спрятаны в разных уголках карты и могут быть найдены во время путешествий.</li>
+                        </ul>
+
+                        <img loading="lazy" src="wiki_images_webp/12.webp" alt="Алтарь Бога" class="wiki-img" style="width:60%;">
+
+                        <div class="callout-info">
+                            <p class="ct">Что можно делать у алтаря</p>
+                            <ul class="night-list" style="margin:0;">
+                                <li>Просматривать список божественных очивок</li>
+                                <li>Отслеживать прогресс выполнения</li>
+                                <li>Получать награды в Таймах</li>
+                                <li>Пользоваться Божественным магазином (в разработке)</li>
+                            </ul>
+                        </div>
+
+                        <img loading="lazy" src="wiki_images_webp/13.webp" alt="Божественные очивки" class="wiki-img" style="width:60%;">
+                        <img loading="lazy" src="wiki_images_webp/14.webp" alt="Божественный магазин" class="wiki-img" style="width:60%;">
+
+                        <h4 class="article-h4">📈 Ранги и Время</h4>
+
+                        <ul class="night-list">
+                            <li>В профиле отображается общее время, проведённое на сервере.</li>
+                            <li>Чем больше времени игрок проводит в мире Minecraft Times, тем выше становится его Ранг.</li>
+                            <li>Повышение ранга происходит автоматически.</li>
+                        </ul>
+
+                        <h4 class="article-h4">⚖️ Социальный рейтинг</h4>
+
+                        <ul class="night-list">
+                            <li>Каждый игрок может оценить другого игрока положительно (+) или отрицательно (-).</li>
+                            <li>Социальный рейтинг отражает отношение сообщества к игроку.</li>
+                        </ul>
+
+                        <div class="callout-warn">
+                            <p class="ct">⚠️ Важно</p>
+                            <p>
+                                Оценить одного игрока можно только один раз за всё время.
+                                Изменить или отозвать свой выбор невозможно.
+                            </p>
+                        </div>
+
+                        <h4 class="article-h4">🪙 Экономика: Таймы и Купоны</h4>
+
+                        <div class="night-table-wrap">
+                            <table class="night-table">
+                                <thead>
+                                    <tr>
+                                        <th>Валюта</th>
+                                        <th>Назначение</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>⌛ Таймы</td>
+                                        <td>Основная игровая валюта</td>
+                                    </tr>
+                                    <tr>
+                                        <td>🎟️ Купоны</td>
+                                        <td>Магазинная (донатная) валюта</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="callout-tip">
+                            <p>
+                                💡 Таймы можно получить за выполнение божественных очивок,
+                                участие в ивентах и другие серверные активности.
+                            </p>
+                        </div>
+
+                        <div class="callout-info">
+                            <p class="ct">Будущие обновления</p>
+                            <p>
+                                В будущих патчах Купоны можно будет обменивать на заработанные Таймы.
+                                Сейчас система временно отключена и находится в разработке.
+                            </p>
+                        </div>
+                    </article>
+
+                </div><!-- /content-card -->
+            </main>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+            <div class="flex items-center space-x-4">
+                <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" aria-label="YouTube" style="color:#6e7681;" class="hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                </a>
+                <a href="https://www.tiktok.com/@flory_305" target="_blank" rel="noopener noreferrer" aria-label="TikTok" style="color:#6e7681;" class="hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
+                </a>
+                <a href="https://t.me/+DO1GUYR709s4NzBi" target="_blank" rel="noopener noreferrer" aria-label="Telegram" style="color:#6e7681;" class="hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
+                </a>
+            </div>
+            <div class="text-center md:text-right">
+                <p style="color:#6e7681;font-size:.88rem;">Связаться с владельцем: <a href="https://t.me/Flory987" target="_blank" rel="noopener noreferrer" style="color:#58a6ff;" class="hover:underline">@Flory987</a></p>
+                <p style="color:#484f58;font-size:.75rem;margin-top:4px;">Minecraft-Times © 2025. Not an official Minecraft product</p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script>
+document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+    document.getElementById('mobile-menu').classList.toggle('hidden');
+});
+
+const sections = document.querySelectorAll('[id]');
+const navLinks = document.querySelectorAll('.wiki-nav-link');
+const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (e.isIntersecting) {
+            navLinks.forEach(l => l.classList.remove('active'));
+            const a = document.querySelector(`.wiki-nav-link[href="#${e.target.id}"]`);
+            if (a) a.classList.add('active');
+        }
+    });
+}, { rootMargin: '-25% 0px -65% 0px' });
+sections.forEach(s => obs.observe(s));
+
+// Fireflies
+const canvas = document.getElementById('firefly-canvas');
+const ctx = canvas.getContext('2d');
+function resize() { canvas.width = Math.min(window.innerWidth, 1280); canvas.height = Math.min(window.innerHeight, 720); }
+resize(); window.addEventListener('resize', resize);
+
+const flies = Array.from({length: 30}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height * 0.88 + canvas.height * 0.04,
+    vx: (Math.random() - 0.5) * 0.42,
+    vy: (Math.random() - 0.5) * 0.32,
+    r: Math.random() * 1.6 + 0.7,
+    gr: Math.random() * 7 + 4,
+    phase: Math.random() * Math.PI * 2,
+    sp: Math.random() * 0.009 + 0.004,
+    h: Math.floor(Math.random() * 28 + 50),
+}));
+
+function draw(f, a) {
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.gr);
+    g.addColorStop(0,   `hsla(${f.h},95%,78%,${a*0.88})`);
+    g.addColorStop(0.3, `hsla(${f.h},90%,62%,${a*0.4})`);
+    g.addColorStop(1,   `hsla(${f.h},80%,50%,0)`);
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.gr, 0, Math.PI*2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2);
+    ctx.fillStyle = `hsla(${f.h},100%,94%,${a})`; ctx.fill();
+}
+
+let lt = 0;
+function tick(ts) {
+    const dt = Math.min(ts - lt, 50); lt = ts;
+    if (!document.hidden) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    flies.forEach(f => {
+        f.phase += f.sp * (dt / 16);
+        const a = Math.sin(f.phase) * 0.5 + 0.5;
+        f.x += f.vx * (dt / 16); f.y += f.vy * (dt / 16);
+        if (Math.random() < 0.007) { f.vx += (Math.random()-.5)*.14; f.vy += (Math.random()-.5)*.11; }
+        const spd = Math.hypot(f.vx, f.vy);
+        if (spd > 0.65) { f.vx *= 0.65/spd; f.vy *= 0.65/spd; }
+        if (f.x < -20) f.x = canvas.width+20;
+        if (f.x > canvas.width+20) f.x = -20;
+        if (f.y < -20) f.y = canvas.height+20;
+        if (f.y > canvas.height+20) f.y = -20;
+        if (a > 0.04) draw(f, a);
+    });
+    }
+    requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+/* ─────────────────────────────── */
+/*  Custom overrides & extensions  */
+/*  (Spirit theme lives in style.css) */
+/* ─────────────────────────────── */
+
+/* Navbar */
+.navbar-general { padding: 0 20px; }
+@media (min-width: 576px) { .navbar-general { padding: 0 24px; } }
+
+body:after {
+    z-index: 999;
+}
+
+/* Cart Modal (our simplified version) */
+#cart .modal-dialog { max-width: 100%; height: 100%; margin: 0 0 0 auto; }
+.modal-content { border-radius: 0; border: none; }
+.modal.show { display: block; }
+.modal.fade .modal-dialog { transition: transform .3s ease-out; transform: translate(0,-50px); }
+.modal.show .modal-dialog { transform: none; }
+.modal-backdrop { display: none; }
+.modal-backdrop.show { display: block; opacity: 0.5; }
+.modal-open { overflow: hidden; }
+
+.cart { max-width: 100%; height: 100%; border-radius: 0; padding: 0 !important; transition: .2s ease all; }
+@media (min-width: 992px) {
+    .cart { height: 100%; border-bottom-left-radius: 55px; border-top-left-radius: 55px; }
+    #cart .modal-dialog { max-width: 775px; }
+}
+.cart-content { border-radius: 0 !important; height: 100%; overflow-y: auto; }
+@media (min-width: 992px) { .cart-content { border-radius: 55px 0 0 55px !important; } }
+
+/* Pay modal (custom) */
+#buyModal .modal-dialog { max-width: 600px; margin: 30px auto; }
+#buyModal .modal-content { background: var(--spirit-card-background-color); border-radius: 33px; padding: 30px; }
+.pay-method { background: var(--spirit-card-background-color-hover); border-radius: 16px; padding: 16px; cursor: pointer; transition: 0.2s; border: 1px solid var(--border-color-default); display: flex; align-items: center; gap: 12px; }
+.pay-method:hover { border-color: var(--color-accent); }
+.pay-method img { width: 32px; height: 32px; object-fit: contain; }
+.pay-method-name { display: block; font-size: 14px; font-weight: 600; color: var(--color-default); }
+
+.qty-btn { background: var(--spirit-card-background-color-hover); border: 1px solid var(--border-color-default); border-radius: 8px; padding: 8px 16px; color: var(--color-default); font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 14px; }
+.qty-btn:hover { border-color: var(--color-accent); }
+.qty-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: #FFF; }
+
+/* Spinner */
+.spinner-border { display: inline-block; width: 2rem; height: 2rem; vertical-align: text-bottom; border: .25em solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spinner-border .75s linear infinite; }
+@keyframes spinner-border { 100% { transform: rotate(360deg); } }
+
+/* Skeleton overrides */
+body.dark-theme { --spirit-skeleton-gradient: linear-gradient(90deg, #51545500 0, #51545520 20%, #51545580 60%, #51545500); }
+body.light-theme { --spirit-skeleton-gradient: linear-gradient(90deg, #d6d9df00 0, #d6d9df20 20%, #d6d9df80 60%, #d6d9df00); }
+
+/* Utilities */
+.shadow-none { box-shadow: none !important; }
+.overflow-hidden { overflow: hidden; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+
+/* Toast notifications */
+.toast-notification {
+    position: fixed; bottom: 24px; right: 24px; z-index: 99999;
+    padding: 16px 24px; border-radius: 12px; background: var(--surface);
+    border: 1px solid var(--border); color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(20px); opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 360px;
+}
+.toast-notification.show { transform: translateY(0); opacity: 1; }
+.toast-notification strong { display: block; margin-bottom: 4px; }
+.toast-notification p { margin: 0; font-size: 13px; color: var(--text2); }
+.toast-notification.toast-error { border-left: 4px solid #e74c3c; }
+.toast-notification.toast-success { border-left: 4px solid #2ecc71; }
+.toast-notification.toast-info { border-left: 4px solid #3498db; }
+
+/* Responsive */
+@media (max-width: 575px) {
+    .spirit-shop-jumbotron-footer { margin-top: 40px; }
+    .shop-name { font-size: 28px; }
+}

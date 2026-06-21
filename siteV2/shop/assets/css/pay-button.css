@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@900&display=swap');
+
+body.light-theme {
+    --pay-button-background-color: black;
+    --pay-button-badge-background-color: white;
+    --pay-button-badge-color: black;
+    --pay-button-color: white;
+
+    --pay-button-left-icon: url("data:image/svg+xml,%3Csvg width='22' height='50' viewBox='0 0 23 50' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7.88313 7.97251L2.66312 16.9725C-0.216219 21.9369 -0.216219 28.0631 2.66312 33.0275L7.88313 42.0275C10.7454 46.9624 16.0187 50 21.7236 50H22.5034V0L21.7236 0C16.0187 -8.21429e-10 10.7454 3.03759 7.88313 7.97251Z' fill='black'/%3E%3C/svg%3E%0A");
+    --pay-button-right-icon: url("data:image/svg+xml,%3Csvg width='22' height='50' viewBox='0 0 23 50' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15.1239 7.97251L20.344 16.9725C23.2233 21.9369 23.2233 28.0631 20.344 33.0275L15.1239 42.0275C12.2617 46.9624 6.98835 50 1.28345 50H0.503662V0L1.28345 0C6.98835 -8.21429e-10 12.2617 3.03759 15.1239 7.97251Z' fill='black'/%3E%3C/svg%3E%0A");
+}
+
+body.dark-theme {
+    --pay-button-background-color: white;
+    --pay-button-badge-background-color: black;
+    --pay-button-badge-color: white;
+    --pay-button-color: black;
+
+    --pay-button-left-icon: url("data:image/svg+xml,%3Csvg width='22' height='50' viewBox='0 0 23 50' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7.88313 7.97251L2.66312 16.9725C-0.216219 21.9369 -0.216219 28.0631 2.66312 33.0275L7.88313 42.0275C10.7454 46.9624 16.0187 50 21.7236 50H22.5034V0L21.7236 0C16.0187 -8.21429e-10 10.7454 3.03759 7.88313 7.97251Z' fill='white'/%3E%3C/svg%3E%0A");
+    --pay-button-right-icon: url("data:image/svg+xml,%3Csvg width='22' height='50' viewBox='0 0 23 50' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15.1239 7.97251L20.344 16.9725C23.2233 21.9369 23.2233 28.0631 20.344 33.0275L15.1239 42.0275C12.2617 46.9624 6.98835 50 1.28345 50H0.503662V0L1.28345 0C6.98835 -8.21429e-10 12.2617 3.03759 15.1239 7.97251Z' fill='white'/%3E%3C/svg%3E%0A");
+}
+
+.pay-button {
+    background-color: var(--pay-button-background-color);
+    padding: 13px 1px 13px 27px;
+    border: 0;
+    outline: 0;
+    position: relative;
+    transition: .2s ease all;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 24px;
+    color: var(--pay-button-color);
+    width: calc(100% - 46px);
+    max-width: 250px;
+    margin-left: 23px;
+}
+
+.pay-button:hover .pay-button-logo, .pay-button:hover .pay-button-badge {
+    opacity: .8;
+}
+
+.pay-button:active {
+    opacity: .5;
+}
+
+.pay-button:before, .pay-button:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 23px;
+    background-position: center;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+}
+
+.pay-button:before {
+    left: -21px;
+    background-image: var(--pay-button-left-icon);
+}
+
+.pay-button:after {
+    right: -21px;
+    background-image: var(--pay-button-right-icon);
+}
+
+.pay-button .pay-button-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+}
+
+.pay-button .pay-button-logo {
+    position: absolute;
+    top: 50%;
+    left: -7px;
+    width: 26px;
+    height: 26px;
+    transform: translateY(-50%);
+    transition: .2s ease all;
+    line-height: 0;
+}
+
+.pay-button .pay-button-badge {
+    padding: 0 9px;
+    background-color: var(--pay-button-badge-background-color);
+    color: var(--pay-button-badge-color);
+    transition: .2s ease all;
+    font-weight: 900;
+    font-size: 16px;
+    line-height: 20px;
+    border-radius: 999px;
+    font-family: 'Unbounded', system-ui;
+    font-optical-sizing: auto;
+    font-style: normal;
+    text-transform: uppercase;
+}

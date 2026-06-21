@@ -1,0 +1,23 @@
+# Dependencies
+siteV2/node_modules/
+
+# Environment & Config
+siteV2/shop/config.php
+
+# Runtime data (платежи, режим тестирования)
+siteV2/shop/payments.json
+siteV2/shop/test_mode.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Служебные заметки
+siteV2/info.md
